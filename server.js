@@ -1,5 +1,3 @@
-// server.js
-
 import app from "./app.js";
 import { env, logger, connectDB } from "./src/configurations/index.js";
 
