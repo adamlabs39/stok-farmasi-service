@@ -1,8 +1,7 @@
-// src/configurations/index.js
-import { sequelize, connectDB } from "./database";
-import { axios } from "./axios";
-import { env } from "./environment";
-import logger from "./logger";
+import { sequelize, connectDB } from "./database-instance.js";
+import axios  from "./axios-instance.js";
+import { env } from "./environment.js";
+import logger from "./logger.js";
 
 export {
   env,

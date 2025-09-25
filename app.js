@@ -5,7 +5,7 @@ import efp from "express-fileupload";
 import authorizationSdk from "@adameds/authorization-sdk";
 
 import { env, logger } from "./src/configurations/index.js";
-import routes from "./src/routes/index.js";
+import routes from "./src/routes/routes.js";
 import errorMiddleware from "./src/middlewares/error.middleware.js";
 
 const app = express();
@@ -34,11 +34,8 @@ const authConfig = {
   privateKey: env.PRIVATE_KEY,
 };
 app.use(authorizationSdk([], authConfig));
+app.use( routes);
 
-// --- PENGATURAN ROUTE ---
-app.use(`/${env.API_BASE}/${env.API_VERSION}`, routes);
-
-// --- PENGATURAN ERROR HANDLING ---
 app.use(errorMiddleware);
 
 export default app;
