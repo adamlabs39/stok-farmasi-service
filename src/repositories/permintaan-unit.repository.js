@@ -61,6 +61,10 @@ export default class PermintaanUnitRepository {
       whereClause.no_permintaan = { [Op.iLike]: `%${query.no_permintaan}%` };
     }
 
+    if (query.status){
+      whereClause.status = query.status;
+    }
+
     const includeClause = [...this._baseOptions.include];
     const lokasiTujuanInclude = includeClause.find(
       (inc) => inc.as === "lokasi_stok_tujuan"

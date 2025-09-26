@@ -55,24 +55,11 @@ export default class PermintaanUnitService {
       throw error;
     }
   }
-
-  // static async getAllPermintaanUnit(query, faskesUuid) {
-  //   try {
-  //     const result = await PermintaanUnitRepository.getAllPermintaanUnit(
-  //       query,
-  //       faskesUuid
-  //     );
-  //     return PermintaanUnitHelper.mapPermintaanUnits(result);
-  //   } catch (error) {
-  //     throw error;
-  //   }
-  // }
-
+  
   static async getAllPermintaanUnit(query, faskesUuid) {
     try {
       const { rows, count, page, pageSize, totalPages } =
         await PermintaanUnitRepository.getAllPermintaanUnit(query, faskesUuid);
-
       return {
         data: rows,
         pagination: {

@@ -2,11 +2,13 @@ import { ZodError } from "zod";
 import jwt from "jsonwebtoken";
 import { logger } from "../configurations/index.js";
 import ResponseError from "../errors/ResponseError.js";
+import NotFoundError from "../errors/NotFoundError.js";
 
 const { JsonWebTokenError, TokenExpiredError } = jwt;
 
 const errorMiddleware = (err, req, res, next) => {
   logger.error(err.stack || err);
+
   if (err.message && err.message.toLowerCase().includes("authorization")) {
     return res.status(401).json({
       status: "error",
@@ -25,6 +27,13 @@ const errorMiddleware = (err, req, res, next) => {
     return res.status(401).json({
       status: "error",
       message: message,
+    });
+  }
+
+  if (err instanceof NotFoundError || err.statusCode === 404) {
+    return res.status(404).json({
+      status: "error",
+      message: err.message || "Data tidak ditemukan",
     });
   }
 
@@ -48,7 +57,6 @@ const errorMiddleware = (err, req, res, next) => {
     });
   }
 
-  
   return res.status(500).json({
     status: "error",
     message: "Terjadi kesalahan pada server.",
