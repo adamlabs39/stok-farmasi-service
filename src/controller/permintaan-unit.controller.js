@@ -11,4 +11,18 @@ export default class PermintaanUnitController {
       next(error);
     }
   }
+
+  static async getAllPermintaanUnit(req, res, next){
+    try {
+      const faskes_uuid = req.author.faskesUuid;
+      const result = await PermintaanUnitService.getAllPermintaanUnit(
+        req.query,
+        faskes_uuid
+      );
+      res.status(200).json(successResponse("List of permintaan unit", result));
+    } catch (error) {
+      next(error);
+    }
+  }
+
 }

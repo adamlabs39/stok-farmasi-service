@@ -13,6 +13,7 @@ routes.get(`${baseUrl}/health`, (req, res) => res.status(200).json({ message: "O
 
 // PERMINTAAN UNIT
 routes.post(`${baseUrl}/permintaan-unit`, PermintaanUnitController.createPermintaanUnit);
+routes.get(`${baseUrl}/permintaan-unit`, PermintaanUnitController.getAllPermintaanUnit);
 
 export default routes;
 

@@ -4,6 +4,7 @@ import { PermintaanUnitValidation } from "../validations/permintaan-unit.validat
 import PermintaanUnitRepository from "../repositories/permintaan-unit.repository.js";
 import { generateNoPermintaanUnit } from "../helpers/generator.helper.js";
 import ZodValidator from "../validations/zod.validation.js";
+import PermintaanUnitHelper from "../helpers/permintaan-unit.helper.js";
 
 export default class PermintaanUnitService {
   static async createPermintaanUnit(req) {
@@ -16,7 +17,7 @@ export default class PermintaanUnitService {
 
       const faskesUuid = req.author.faskesUuid;
 
-      const itemsToCreate  = validatedData.items.map((item) => ({
+      const itemsToCreate = validatedData.items.map((item) => ({
         ...item,
         uuid: uuidv7(),
         faskes_uuid: faskesUuid,
@@ -26,7 +27,7 @@ export default class PermintaanUnitService {
       const enrichedData = {
         ...validatedData,
         jenis_stok: validatedData.jenis_stok_uuid,
-        jenis_item: validatedData.kategori_item, 
+        jenis_item: validatedData.kategori_item,
 
         uuid: uuidv7(),
         no_permintaan: generateNoPermintaanUnit(),
@@ -51,6 +52,18 @@ export default class PermintaanUnitService {
       return result;
     } catch (error) {
       await transaction.rollback();
+      throw error;
+    }
+  }
+
+  static async getAllPermintaanUnit(query, faskesUuid) {
+    try {
+      const result = await PermintaanUnitRepository.getAllPermintaanUnit(
+        query,
+        faskesUuid
+      );
+      return PermintaanUnitHelper.mapPermintaanUnits(result);
+    } catch (error) {
       throw error;
     }
   }
