@@ -33,6 +33,12 @@ const createPermintaanUnitSchema = z.object({
     .nonempty({ message: "Daftar item tidak boleh kosong." }),
 });
 
+const CANCEL = z.object({
+  alasan_batal: z.string().min(1, { message: "alasan_batal tidak boleh kosong." }),
+  status: z.literal("cancel"),
+});
+
 export class PermintaanUnitValidation {
   static CREATE = createPermintaanUnitSchema;
+  static CANCEL = CANCEL;
 }

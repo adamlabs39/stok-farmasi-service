@@ -79,4 +79,21 @@ export default class PermintaanUnitRepository {
       order: [["tanggal_permintaan", "DESC"]],
     });
   }
+
+  static async cancelPermintaanUnit (uuid, faskesUuid, reqData, transaction) {
+    return PermintaanUnitModel.update(
+      {
+        ...reqData,
+        status: "cancel",
+      },
+      {
+        where: {
+          uuid,
+          faskes_uuid: faskesUuid,
+          status: { [Op.ne]: "cancel" },
+        },
+        transaction,
+      }
+    );
+  }
 }

@@ -67,4 +67,24 @@ export default class PermintaanUnitService {
       throw error;
     }
   }
+
+  static async cancelPermintaanUnit(uuid, faskesUuid, reqData) {
+    const transaction = await sequelize.transaction();
+    try {
+      const validatedData = ZodValidator.validate(
+        PermintaanUnitValidation.CANCEL,
+        reqData
+      );
+      await PermintaanUnitRepository.cancelPermintaanUnit(
+        uuid,
+        faskesUuid, 
+        validatedData,
+        transaction
+      );
+      await transaction.commit();
+    } catch (error) {
+      await transaction.rollback();
+      throw error;
+    }
+  }
 }

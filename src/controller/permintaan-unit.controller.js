@@ -25,4 +25,18 @@ export default class PermintaanUnitController {
     }
   }
 
+  static async cancelPermintaanUnit(req, res, next) {
+    try {
+      const { uuid } = req.params;
+      const faskesUuid = req.author.faskesUuid;
+      const reqData = req.body;
+      await PermintaanUnitService.cancelPermintaanUnit(uuid, faskesUuid, reqData);
+      res
+        .status(200)
+        .json(successResponse("Permintaan unit berhasil dibatalkan"));
+    } catch (error) {
+      next(error);
+    }
+  }
+
 }
