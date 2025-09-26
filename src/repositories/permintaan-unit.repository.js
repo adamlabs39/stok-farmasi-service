@@ -4,6 +4,7 @@ import {
   PermintaanUnitModel,
 } from "@adameds/model-sdk/inventory";
 import { Op } from "sequelize";
+import { getPagination, getPagingData } from "../helpers/pagination.helper.js";
 
 export default class PermintaanUnitRepository {
   static get _baseOptions() {
@@ -55,32 +56,39 @@ export default class PermintaanUnitRepository {
 
   static async getAllPermintaanUnit(query, faskesUuid) {
     const whereClause = { faskes_uuid: faskesUuid };
+
     if (query.no_permintaan) {
       whereClause.no_permintaan = { [Op.iLike]: `%${query.no_permintaan}%` };
     }
 
-     const includeClause = [...this._baseOptions.include]; 
-     const lokasiTujuanInclude = includeClause.find(
-       (inc) => inc.as === "lokasi_stok_tujuan"
-     );
+    const includeClause = [...this._baseOptions.include];
+    const lokasiTujuanInclude = includeClause.find(
+      (inc) => inc.as === "lokasi_stok_tujuan"
+    );
 
-     if (query.nama_lokasi_tujuan && lokasiTujuanInclude) {
-       lokasiTujuanInclude.where = {
-         name: { [Op.iLike]: `%${query.nama_lokasi_tujuan}%` },
-       };
-       lokasiTujuanInclude.required = true; 
-     }
+    if (query.nama_lokasi_tujuan && lokasiTujuanInclude) {
+      lokasiTujuanInclude.where = {
+        name: { [Op.iLike]: `%${query.nama_lokasi_tujuan}%` },
+      };
+      lokasiTujuanInclude.required = true;
+    }
 
+    // pagination
+    const { limit, offset, page, pageSize } = getPagination(query);
 
-    return PermintaanUnitModel.findAll({
+    const result = await PermintaanUnitModel.findAndCountAll({
       where: whereClause,
       ...this._baseOptions,
       include: includeClause,
       order: [["tanggal_permintaan", "DESC"]],
+      limit,
+      offset,
     });
+
+    return getPagingData(result, page, pageSize);
   }
 
-  static async cancelPermintaanUnit (uuid, faskesUuid, reqData, transaction) {
+  static async cancelPermintaanUnit(uuid, faskesUuid, reqData, transaction) {
     return PermintaanUnitModel.update(
       {
         ...reqData,

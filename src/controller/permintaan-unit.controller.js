@@ -19,7 +19,11 @@ export default class PermintaanUnitController {
         req.query,
         faskes_uuid
       );
-      res.status(200).json(successResponse("List of permintaan unit", result));
+       res.status(200).json({
+         message: "List of permintaan unit",
+         payload: result.data,
+         pagination: result.pagination,
+       });
     } catch (error) {
       next(error);
     }
