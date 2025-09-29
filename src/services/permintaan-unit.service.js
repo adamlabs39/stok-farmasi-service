@@ -127,7 +127,7 @@ export default class PermintaanUnitService {
 
       if (updatedRowsCount === 0) {
         throw new ResponseError(
-          "Tidak dapat mengubah status karena permintaan sudah dibatalkan atau tidak ditemukan.",
+          "Tidak dapat mengubah status ataupun melakukan cancel.",
           400
         );
       }

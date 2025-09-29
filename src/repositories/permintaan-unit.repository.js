@@ -127,7 +127,7 @@ export default class PermintaanUnitRepository {
         uuid,
         faskes_uuid: faskesUuid,
         status: {
-          [Op.ne]: "cancel",
+          [Op.in]: ["request", "request_sebagian"],
         },
       },
       transaction,
