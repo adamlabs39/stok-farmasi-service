@@ -4,7 +4,6 @@ import { PermintaanUnitValidation } from "../validations/permintaan-unit.validat
 import PermintaanUnitRepository from "../repositories/permintaan-unit.repository.js";
 import { generateNoPermintaanUnit } from "../helpers/generator.helper.js";
 import ZodValidator from "../validations/zod.validation.js";
-import PermintaanUnitHelper from "../helpers/permintaan-unit.helper.js";
 
 export default class PermintaanUnitService {
   static async createPermintaanUnit(req) {
