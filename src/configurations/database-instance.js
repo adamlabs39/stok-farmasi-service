@@ -13,8 +13,8 @@ const sequelize = new Sequelize(
     port: process.env.DB_PORT,
     dialect: process.env.DB_DIALECT,
     pool: {
-      max: poolConfig.max || 5,
-      min: poolConfig.min || 0,
+      max: poolConfig.max || 30,
+      min: poolConfig.min || 10,
       acquire: poolConfig.acquire || 30000,
       idle: poolConfig.idle || 10000,
     },
