@@ -4,8 +4,41 @@ import { PermintaanUnitValidation } from "../validations/permintaan-unit.validat
 import PermintaanUnitRepository from "../repositories/permintaan-unit.repository.js";
 import { generateNoPermintaanUnit } from "../helpers/generator.helper.js";
 import ZodValidator from "../validations/zod.validation.js";
+import PermintaanUnitHelper from "../helpers/permintaan-unit.helper.js";
+import NotFoundError from "../errors/NotFoundError.js";
+import ResponseError from "../errors/ResponseError.js";
 
 export default class PermintaanUnitService {
+  static async getAllPermintaanUnit(query, faskesUuid) {
+    try {
+      const { rows, count, page, pageSize, totalPages } =
+        await PermintaanUnitRepository.getAllPermintaanUnit(query, faskesUuid);
+      return {
+        data: PermintaanUnitHelper.mapPermintaanUnits(rows),
+        pagination: {
+          page,
+          pageSize,
+          totalData: count,
+          totalPages,
+        },
+      };
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  static async getPermintaanUnitByUuid(uuid, faskesUuid) {
+    try {
+      const result = await PermintaanUnitRepository.getPermintaanUnitByUuid(
+        uuid,
+        faskesUuid
+      );
+      return { data: PermintaanUnitHelper.mapPermintaanUnit(result) };
+    } catch (error) {
+      throw error;
+    }
+  }
+
   static async createPermintaanUnit(req) {
     const transaction = await sequelize.transaction();
     try {
@@ -57,48 +90,47 @@ export default class PermintaanUnitService {
 
   static async searchitem(query, faskesUuid) {
     try {
-      const result = await PermintaanUnitRepository.searchitem( 
+      const result = await PermintaanUnitRepository.searchitem(
         query,
         faskesUuid
       );
       return result;
-    }
-    catch (error) {
-      throw error;
-    }
-  } 
-
-  static async getAllPermintaanUnit(query, faskesUuid) {
-    try {
-      const { rows, count, page, pageSize, totalPages } =
-        await PermintaanUnitRepository.getAllPermintaanUnit(query, faskesUuid);
-      return {
-        data: rows,
-        pagination: {
-          page,
-          pageSize,
-          totalData: count,
-          totalPages,
-        },
-      };
     } catch (error) {
       throw error;
     }
   }
 
-  static async cancelPermintaanUnit(uuid, faskesUuid, reqData) {
+  static async updateStatusPenerimaan(uuid, faskesUuid, req) {
     const transaction = await sequelize.transaction();
     try {
       const validatedData = ZodValidator.validate(
         PermintaanUnitValidation.CANCEL,
-        reqData
+        req.body
       );
-      await PermintaanUnitRepository.cancelPermintaanUnit(
-        uuid,
-        faskesUuid,
-        validatedData,
-        transaction
-      );
+
+      const dataToUpdate = { ...validatedData };
+      const petugas = req.author.username;
+
+      if(validatedData.status === "verified" || validatedData.status === "verif_sebagian") {
+      dataToUpdate.petugas_verifikasi = petugas;
+      }else if(validatedData.status === "dikirim") {
+      dataToUpdate.petugas_kirim = petugas;
+      }
+
+      const [updatedRowsCount] =
+        await PermintaanUnitRepository.updateStatusPenerimaan(
+          uuid,
+          faskesUuid,
+          dataToUpdate,
+          transaction
+        );
+
+      if (updatedRowsCount === 0) {
+        throw new ResponseError(
+          "Tidak dapat mengubah status karena permintaan sudah dibatalkan atau tidak ditemukan.",
+          400
+        );
+      }
       await transaction.commit();
     } catch (error) {
       await transaction.rollback();

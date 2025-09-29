@@ -14,8 +14,12 @@ routes.get(`${baseUrl}/health`, (req, res) => res.status(200).json({ message: "O
 // PERMINTAAN UNIT
 routes.post(`${baseUrl}/permintaan-unit`, PermintaanUnitController.createPermintaanUnit);
 routes.get(`${baseUrl}/permintaan-unit`, PermintaanUnitController.getAllPermintaanUnit);
-routes.put(`${baseUrl}/permintaan-unit/:uuid/cancel`, PermintaanUnitController.cancelPermintaanUnit);
+routes.put(
+  `${baseUrl}/permintaan-unit/:uuid/status`,
+  PermintaanUnitController.updateStatusPenerimaan
+);
 routes.get(`${baseUrl}/permintaan-unit/search-item`, PermintaanUnitController.searchitem);
+routes.get(`${baseUrl}/permintaan-unit/:uuid`, PermintaanUnitController.getPermintaanUnitByUuid);
 
 export default routes;
 

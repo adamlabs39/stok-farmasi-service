@@ -42,32 +42,6 @@ export default class PermintaanUnitRepository {
     };
   }
 
-  static async createPermintaanUnit(data, transaction) {
-    return PermintaanUnitModel.create(data, {
-      include: [
-        {
-          model: PermintaanUnitItemModel,
-          as: "items",
-        },
-      ],
-      transaction,
-    });
-  }
-
-  static async searchitem(query, faskesUuid) {
-    const whereClause = { faskes_uuid: faskesUuid };
-    if (query.q) {
-      whereClause[Op.or] = [
-        { code: { [Op.iLike]: `%${query.q}%` } },
-        { name: { [Op.iLike]: `%${query.q}%` } },
-      ];
-    }
-    return ItemMedisModel.findAll({
-      where: whereClause,
-      attributes: ["code", "name"]
-    });
-  }
-
   static async getAllPermintaanUnit(query, faskesUuid) {
     const whereClause = { faskes_uuid: faskesUuid };
 
@@ -75,7 +49,7 @@ export default class PermintaanUnitRepository {
       whereClause.no_permintaan = { [Op.iLike]: `%${query.no_permintaan}%` };
     }
 
-    if (query.status){
+    if (query.status) {
       whereClause.status = query.status;
     }
 
@@ -106,20 +80,57 @@ export default class PermintaanUnitRepository {
     return getPagingData(result, page, pageSize);
   }
 
-  static async cancelPermintaanUnit(uuid, faskesUuid, reqData, transaction) {
-    return PermintaanUnitModel.update(
-      {
-        ...reqData,
-        status: "cancel",
+  static async getPermintaanUnitByUuid(uuid, faskesUuid) {
+    return PermintaanUnitModel.findOne({
+      where: {
+        uuid,
+        faskes_uuid: faskesUuid,
       },
-      {
-        where: {
-          uuid,
-          faskes_uuid: faskesUuid,
-          status: { [Op.ne]: "cancel" },
+      ...this._baseOptions,
+    });
+  }
+
+  static async createPermintaanUnit(data, transaction) {
+    return PermintaanUnitModel.create(data, {
+      include: [
+        {
+          model: PermintaanUnitItemModel,
+          as: "items",
         },
-        transaction,
-      }
-    );
+      ],
+      transaction,
+    });
+  }
+
+  static async searchitem(query, faskesUuid) {
+    const whereClause = { faskes_uuid: faskesUuid };
+    if (query.q) {
+      whereClause[Op.or] = [
+        { code: { [Op.iLike]: `%${query.q}%` } },
+        { name: { [Op.iLike]: `%${query.q}%` } },
+      ];
+    }
+    return ItemMedisModel.findAll({
+      where: whereClause,
+      attributes: ["code", "name"],
+    });
+  }
+
+  static async updateStatusPenerimaan(
+    uuid,
+    faskesUuid,
+    dataToUpdate,
+    transaction
+  ) {
+    return PermintaanUnitModel.update(dataToUpdate, {
+      where: {
+        uuid,
+        faskes_uuid: faskesUuid,
+        status: {
+          [Op.ne]: "cancel",
+        },
+      },
+      transaction,
+    });
   }
 }

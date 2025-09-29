@@ -34,8 +34,19 @@ const createPermintaanUnitSchema = z.object({
 });
 
 const CANCEL = z.object({
-  alasan_batal: z.string().min(1, { message: "alasan_batal tidak boleh kosong." }),
-  status: z.literal("cancel"),
+  alasan_batal: z
+    .string()
+    .min(1, { message: "alasan_batal tidak boleh kosong." })
+    .optional(),
+  catatan_pengiriman: z
+    .string()
+    .min(1, { message: "catatan_pengiriman tidak boleh kosong." })
+    .optional(),
+    catatan_verifikasi: z
+    .string()
+    .min(1, { message: "catatan_verifikasi tidak boleh kosong." })
+    .optional(),
+  status: z.enum(["request", "request_sebagian", "verified", "dikirim", "verif_sebagian", "cancel"]),
 });
 
 export class PermintaanUnitValidation {

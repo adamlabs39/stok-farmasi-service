@@ -1,10 +1,6 @@
-
-class ResponseError extends Error {
-
-  constructor(statusCode, message) {
+export default class ResponseError extends Error {
+  constructor(message, statusCode) {
     super(message);
     this.statusCode = statusCode;
   }
 }
-
-export default ResponseError;
