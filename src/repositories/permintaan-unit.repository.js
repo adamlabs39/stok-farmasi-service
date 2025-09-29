@@ -1,4 +1,4 @@
-import { LokasiStokModel } from "@adameds/model-sdk/farmasi";
+import { ItemMedisModel, LokasiStokModel } from "@adameds/model-sdk/farmasi";
 import {
   PermintaanUnitItemModel,
   PermintaanUnitModel,
@@ -51,6 +51,20 @@ export default class PermintaanUnitRepository {
         },
       ],
       transaction,
+    });
+  }
+
+  static async searchitem(query, faskesUuid) {
+    const whereClause = { faskes_uuid: faskesUuid };
+    if (query.q) {
+      whereClause[Op.or] = [
+        { code: { [Op.iLike]: `%${query.q}%` } },
+        { name: { [Op.iLike]: `%${query.q}%` } },
+      ];
+    }
+    return ItemMedisModel.findAll({
+      where: whereClause,
+      attributes: ["code", "name"]
     });
   }
 

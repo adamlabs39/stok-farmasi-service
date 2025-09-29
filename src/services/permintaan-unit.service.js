@@ -55,7 +55,20 @@ export default class PermintaanUnitService {
       throw error;
     }
   }
-  
+
+  static async searchitem(query, faskesUuid) {
+    try {
+      const result = await PermintaanUnitRepository.searchitem( 
+        query,
+        faskesUuid
+      );
+      return result;
+    }
+    catch (error) {
+      throw error;
+    }
+  } 
+
   static async getAllPermintaanUnit(query, faskesUuid) {
     try {
       const { rows, count, page, pageSize, totalPages } =

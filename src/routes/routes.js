@@ -15,6 +15,7 @@ routes.get(`${baseUrl}/health`, (req, res) => res.status(200).json({ message: "O
 routes.post(`${baseUrl}/permintaan-unit`, PermintaanUnitController.createPermintaanUnit);
 routes.get(`${baseUrl}/permintaan-unit`, PermintaanUnitController.getAllPermintaanUnit);
 routes.put(`${baseUrl}/permintaan-unit/:uuid/cancel`, PermintaanUnitController.cancelPermintaanUnit);
+routes.get(`${baseUrl}/permintaan-unit/search-item`, PermintaanUnitController.searchitem);
 
 export default routes;
 

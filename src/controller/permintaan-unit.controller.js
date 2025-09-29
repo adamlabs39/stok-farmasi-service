@@ -12,6 +12,22 @@ export default class PermintaanUnitController {
     }
   }
 
+  static async searchitem(req, res, next) {
+    try {
+      const faskes_uuid = req.author.faskesUuid;
+      const result = await PermintaanUnitService.searchitem(
+        req.query,
+        faskes_uuid
+      );
+      res.status(200).json({
+        message: "List of item",
+        payload: result,
+      });
+    } catch (error) { 
+      next(error);
+    }
+  }
+
   static async getAllPermintaanUnit(req, res, next){
     try {
       const faskes_uuid = req.author.faskesUuid;
