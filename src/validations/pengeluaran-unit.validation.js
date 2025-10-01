@@ -15,9 +15,6 @@ const CREATE = z
       ["pemakaian unit", "pengeluaran tanpa permintaan", "pemusnahan barang"],
       { required_error: "Jenis pengeluaran wajib diisi" }
     ),
-    tanggal_pengeluaran: z
-      .number()
-      .positive({ message: "Tanggal pengeluaran tidak valid" }),
     kategori_item: z.enum(["medis", "non-medis"], {
       required_error: "Kategori item wajib diisi",
     }),
