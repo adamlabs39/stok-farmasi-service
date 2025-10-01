@@ -61,7 +61,7 @@ const UPDATE_STATUS = z
       "verified",
       "dikirim",
       "verif_sebagian",
-      "UPDATE_STATUS",
+      "cancel",
     ]),
     items: z.array(itemStatusUpdateSchema).optional(),
   })

@@ -144,11 +144,11 @@ export default class PermintaanUnitRepository {
       throw new NotFoundError("Permintaan unit tidak ditemukan.");
     }
     if(['cancel', 'dikirim']. includes(permintaan.status)) {
-      throw new ResponseError("Permintaan unit sudah dibatalkan atau dikirim, tidak bisa diubah statusnya.");
+      throw new ResponseError("Permintaan unit sudah dibatalkan atau dikirim, tidak bisa diubah statusnya.", 400);
     }
 
     if(dataToUpdate.status === 'cancel' && ['verified', 'verif_sebagian', 'dikirim'].includes(permintaan.status)) {
-      throw new ResponseError("Permintaan unit sudah diverifikasi atau dikirim, tidak bisa dibatalkan.");
+      throw new ResponseError("Permintaan unit sudah diverifikasi atau dikirim, tidak bisa dibatalkan.", 400);
     }
 
     return PermintaanUnitModel.update(dataToUpdate, {
