@@ -12,7 +12,7 @@ export default class PermintaanUnitController {
       res.status(200).json({
         message: "List of permintaan unit",
         payload: result.data,
-        pagination: result.pagination,
+        properties: result.pagination,
       });
     } catch (error) {
       next(error);

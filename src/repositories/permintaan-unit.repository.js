@@ -5,6 +5,8 @@ import {
 } from "@adameds/model-sdk/inventory";
 import { Op } from "sequelize";
 import { getPagination, getPagingData } from "../helpers/pagination.helper.js";
+import NotFoundError from "../errors/NotFoundError.js";
+import ResponseError from "../errors/ResponseError.js";
 
 export default class PermintaanUnitRepository {
   static get _baseOptions() {
@@ -116,20 +118,41 @@ export default class PermintaanUnitRepository {
     });
   }
 
-  static async updateStatusPenerimaan(
+  static async bulkUpdateItems(items, transaction) {
+    const promises = items.map((item) =>
+      PermintaanUnitItemModel.update(item.dataToUpdate, {
+        where: { uuid: item.uuid },
+        transaction,
+      })
+    );
+    return Promise.all(promises);
+  }
+
+  static async updateStatusPermintaan(
     uuid,
     faskesUuid,
     dataToUpdate,
     transaction
   ) {
+    const permintaan = await PermintaanUnitModel.findOne({
+      where: { uuid, faskes_uuid: faskesUuid },
+      attributes: ['status'],
+      transaction
+    });
+
+    if (!permintaan) {
+      throw new NotFoundError("Permintaan unit tidak ditemukan.");
+    }
+    if(['cancel', 'dikirim']. includes(permintaan.status)) {
+      throw new ResponseError("Permintaan unit sudah dibatalkan atau dikirim, tidak bisa diubah statusnya.");
+    }
+
+    if(dataToUpdate.status === 'cancel' && ['verified', 'verif_sebagian', 'dikirim'].includes(permintaan.status)) {
+      throw new ResponseError("Permintaan unit sudah diverifikasi atau dikirim, tidak bisa dibatalkan.");
+    }
+
     return PermintaanUnitModel.update(dataToUpdate, {
-      where: {
-        uuid,
-        faskes_uuid: faskesUuid,
-        status: {
-          [Op.in]: ["request", "request_sebagian"],
-        },
-      },
+      where: { uuid, faskes_uuid: faskesUuid },
       transaction,
     });
   }

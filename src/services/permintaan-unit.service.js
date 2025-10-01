@@ -104,33 +104,132 @@ export default class PermintaanUnitService {
     const transaction = await sequelize.transaction();
     try {
       const validatedData = ZodValidator.validate(
-        PermintaanUnitValidation.CANCEL,
+        PermintaanUnitValidation.UPDATE_STATUS,
         req.body
       );
 
-      const dataToUpdate = { ...validatedData };
       const petugas = req.author.username;
 
-      if(validatedData.status === "verified" || validatedData.status === "verif_sebagian") {
-      dataToUpdate.petugas_verifikasi = petugas;
-      }else if(validatedData.status === "dikirim") {
-      dataToUpdate.petugas_kirim = petugas;
-      }
+      if (validatedData.status === "dikirim") {
+        const originalPermintaan =
+          await PermintaanUnitRepository.getPermintaanUnitByUuid(
+            uuid,
+            faskesUuid
+          );
+        if (
+          !originalPermintaan ||
+          ["cancel", "dikirim"].includes(originalPermintaan.status)
+        ) {
+          throw new ResponseError(
+            "Permintaan unit tidak ditemukan atau sudah dibatalkan/dikirim.",
+            400
+          );
+        }
 
-      const [updatedRowsCount] =
-        await PermintaanUnitRepository.updateStatusPenerimaan(
-          uuid,
-          faskesUuid,
-          dataToUpdate,
+        const leftoverItems = [];
+        const itemsToUpdate = [];
+        const shippedItemsMap = new Map(
+          validatedData.items.map((i) => [i.uuid, i.qty_pengiriman])
+        );
+        let isPartialShipment = false;
+
+        for (const item of originalPermintaan.items) {
+          const qty_pengiriman = shippedItemsMap.get(item.uuid) || 0;
+          if (qty_pengiriman > item.qty_permintaan) {
+            throw new ResponseError(
+              `Kuantitas pengiriman untuk item ${item.uuid} melebihi kuantitas permintaan.`,
+              400
+            );
+          }
+
+          itemsToUpdate.push({
+            uuid: item.uuid,
+            dataToUpdate: { qty_pengiriman },
+          });
+
+          const remainingQty = item.qty_permintaan - qty_pengiriman;
+          if (remainingQty > 0) {
+            isPartialShipment = true;
+            leftoverItems.push({
+              uuid: uuidv7(),
+              faskes_uuid: faskesUuid,
+              kategori_item: item.kategori_item,
+              item_uuid: item.item_uuid,
+              qty_permintaan: remainingQty,
+              konversi_uuid: item.konversi_uuid,
+            });
+          }
+        }
+        await PermintaanUnitRepository.bulkUpdateItems(
+          itemsToUpdate,
           transaction
         );
 
-      if (updatedRowsCount === 0) {
-        throw new ResponseError(
-          "Tidak dapat mengubah status ataupun melakukan cancel.",
-          400
+        const dataUpdateOriginal = {
+          status: "dikirim",
+          petugas_kirim: petugas,
+          catatan_pengiriman: validatedData.catatan_pengiriman || null,
+        };
+        await PermintaanUnitRepository.updateStatusPermintaan(
+          uuid,
+          faskesUuid,
+          dataUpdateOriginal,
+          transaction
         );
+
+        if (isPartialShipment && leftoverItems.length > 0) {
+          const newPermintaanData = {
+            uuid: uuidv7(),
+            faskes_uuid: faskesUuid,
+            no_permintaan: generateNoPermintaanUnit(),
+            tanggal_permintaan: Date.now(),
+            total_item: leftoverItems.length,
+            status: "request_sebagian",
+            petugas_permintaan_uuid: originalPermintaan.petugas_permintaan_uuid,
+            petugas_permintaan: originalPermintaan.petugas_permintaan,
+            lokasi_stok_tujuan_uuid: originalPermintaan.lokasi_stok_tujuan_uuid,
+            kategori_item: originalPermintaan.kategori_item,
+            jenis_stok_uuid: originalPermintaan.jenis_stok_uuid,
+            catatan: `Permintaan lanjutan dari ${originalPermintaan.no_permintaan}`,
+            items: leftoverItems,
+            jenis_stok: originalPermintaan.jenis_stok,
+            jenis_item: originalPermintaan.jenis_item,
+            lokasi_stok_awal_uuid: originalPermintaan.lokasi_stok_awal_uuid,
+            cito: originalPermintaan.cito,
+          };
+          await PermintaanUnitRepository.createPermintaanUnit(
+            newPermintaanData,
+            transaction
+          );
+        }
+      } else {
+        const dataToUpdate = {
+          status: validatedData.status,
+        };
+
+        if (["verified", "verif_sebagian"].includes(validatedData.status)) {
+          dataToUpdate.petugas_verifikasi = petugas;
+          dataToUpdate.catatan_verifikasi =
+            validatedData.catatan_verifikasi || null;
+        } else if (validatedData.status === "cancel") {
+          dataToUpdate.alasan_batal = validatedData.alasan_batal || null;
+        }
+
+        const [updatedRowCount] =
+          await PermintaanUnitRepository.updateStatusPermintaan(
+            uuid,
+            faskesUuid,
+            dataToUpdate,
+            transaction
+          );
+
+        if (updatedRowCount === 0) {
+          throw new NotFoundError(
+            "Permintaan unit tidak ditemukan atau tidak dapat diupdate."
+          );
+        }
       }
+
       await transaction.commit();
     } catch (error) {
       await transaction.rollback();
