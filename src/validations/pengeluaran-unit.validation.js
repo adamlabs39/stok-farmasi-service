@@ -43,6 +43,7 @@ const CREATE = z
           "Jenis pemusnahan wajib diisi jika jenis pengeluaran adalah pemusnahan barang",
         path: ["jenis_pemusnahan"],
       });
+      
     }
   });
 

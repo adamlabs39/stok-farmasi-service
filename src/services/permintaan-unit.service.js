@@ -110,7 +110,7 @@ export default class PermintaanUnitService {
 
       const petugas = req.author.username;
 
-      if (validatedData.status === "dikirim") {
+      if (validatedData.status === "verif_sebagian") {
         const originalPermintaan =
           await PermintaanUnitRepository.getPermintaanUnitByUuid(
             uuid,
@@ -166,9 +166,9 @@ export default class PermintaanUnitService {
         );
 
         const dataUpdateOriginal = {
-          status: "dikirim",
-          petugas_kirim: petugas,
-          catatan_pengiriman: validatedData.catatan_pengiriman || null,
+          status: "verif_sebagian",
+          petugas_verifikasi: petugas,
+          catatan_verifikasi: validatedData.catatan_pengiriman || null,
         };
         await PermintaanUnitRepository.updateStatusPermintaan(
           uuid,
@@ -207,11 +207,15 @@ export default class PermintaanUnitService {
           status: validatedData.status,
         };
 
-        if (["verified", "verif_sebagian"].includes(validatedData.status)) {
+        if (validatedData.status === "verified") {
           dataToUpdate.petugas_verifikasi = petugas;
           dataToUpdate.catatan_verifikasi =
             validatedData.catatan_verifikasi || null;
-        } else if (validatedData.status === "cancel") {
+        }else if (validatedData.status === "dikirim") {
+          dataToUpdate.petugas_pengiriman = petugas; 
+          dataToUpdate.catatan_pengiriman =validatedData.catatan_pengiriman || null;
+        }
+        else if (validatedData.status === "cancel") {
           dataToUpdate.alasan_batal = validatedData.alasan_batal || null;
         }
 
