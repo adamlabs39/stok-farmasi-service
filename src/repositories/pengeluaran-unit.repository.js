@@ -1,5 +1,6 @@
 import {
   ConversionModel,
+  ItemMedisJenisStokModel,
   ItemMedisModel,
   JenisStokModel,
   LokasiStokModel,
@@ -43,13 +44,6 @@ export default class PengeluaranUnitRepository {
     };
   }
 
-  static async createPengeluaranUnit(data, transaction) {
-    return PengeluaranUnitModel.create(data, {
-      include: [{ model: PengeluaranUnitItemModel, as: "items" }],
-      transaction,
-    });
-  }
-
   static async searchItem(query, faskesUuid) {
     const whereClause = { faskes_uuid: faskesUuid };
     if (query.q) {
@@ -88,4 +82,67 @@ export default class PengeluaranUnitRepository {
       ...this._baseOptions,
     });
   }
+
+  static async findStokDetailsByUuids(stockUuids) {
+    return await StockMedisModel.findAll({
+      where: {
+        uuid: { [Op.in]: stockUuids },
+      },
+      include: [
+        {
+          model: ItemMedisJenisStokModel,
+          as: "item_medis_jenis_stok",
+          attributes: ["item_medis_uuid"],
+        },
+      ],
+    });
+  }
+
+  static async reduceLocalStock(items, transaction) {
+    const stockUpdates = items.map((item) =>
+      StockMedisModel.decrement("sisa_stok", {
+        by: item.qty,
+        where: { uuid: item.stock_uuid },
+        transaction,
+      })
+    );
+    await Promise.all(stockUpdates);
+  }
+  
+  static async createPengeluaranUnit(data, transaction) {
+    return PengeluaranUnitModel.create(data, {
+      include: [
+        {
+          model: PengeluaranUnitItemModel,
+          as: "items", 
+        },
+      ],
+      transaction,
+    });
+  }
+  
+  // static async createPengeluaranUnit(data, transaction) {
+  //   const pengeluaranUnit = await PengeluaranUnitModel.create(data, {
+  //     include: [{ model: PengeluaranUnitItemModel, as: "items" }],
+  //     transaction,
+  //   });
+  //   console.log("data pengeluaranUnit:", data);
+
+  //   const itemToCreate = data.item.map((item) => ({
+  //     ...item,
+  //     faskes_uuid: data.faskes_uuid,
+  //     pengeluaran_unit_uuid: pengeluaranUnit.uuid,
+  //   }));
+  //   console.log("Items to create:", itemToCreate);
+
+  //   await PengeluaranUnitItemModel.bulkCreate(itemToCreate, { transaction });
+  //   return pengeluaranUnit;
+  // }
+
+  // static async createPengeluaranUnit(data, transaction) {
+  //   return PengeluaranUnitModel.create(data, {
+  //     include: [{ model: PengeluaranUnitItemModel, as: "items" }],
+  //     transaction,
+  //   });
+  // }
 }

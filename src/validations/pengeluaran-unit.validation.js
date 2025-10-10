@@ -27,7 +27,8 @@ const CREATE = z
       .uuid({ message: "Lokasi stok awal UUID tidak valid" }),
     lokasi_stok_tujuan_uuid: z
       .string()
-      .uuid({ message: "Lokasi stok tujuan UUID tidak valid" }),
+      .uuid({ message: "Lokasi stok tujuan UUID tidak valid" })
+      .optional(),
     catatan: z.string().optional(),
     jenis_pemusnahan: z.enum(["rusak", "kadaluarsa"]).optional(),
     items: z.array(itemSchema).min(1, { message: "Minimal harus ada 1 item" }),
@@ -43,7 +44,6 @@ const CREATE = z
           "Jenis pemusnahan wajib diisi jika jenis pengeluaran adalah pemusnahan barang",
         path: ["jenis_pemusnahan"],
       });
-      
     }
   });
 

@@ -13,7 +13,7 @@
   "license": "ISC",
   "dependencies": {
     "@adameds/authorization-sdk": "^1.0.5",
-    "@adameds/model-sdk": "^1.0.91",
+    "@adameds/model-sdk": "^1.0.92",
     "axios": "^1.12.2",
     "cors": "^2.8.5",
     "dotenv": "^17.2.2",

@@ -6,18 +6,42 @@ import ResponseError from "../errors/ResponseError.js";
 const { JsonWebTokenError, TokenExpiredError } = jwt;
 
 const errorMiddleware = (err, req, res, next) => {
-  logger.error(err.stack || err.message || err);
+  logger.error(err.stack || err);
 
-  if (err instanceof JsonWebTokenError || err instanceof TokenExpiredError) {
-    const message =
-      err instanceof TokenExpiredError
-        ? "Token sudah kedaluwarsa, silakan login kembali."
-        : "Token tidak valid, silakan login kembali.";
-    return res.status(401).json({ status: "error", message });
+  // --- Penanganan Error dari Axios ---
+  // Cek apakah ini error dari panggilan API menggunakan Axios
+  if (err.isAxiosError && err.response) {
+    return res.status(err.response.status).json({
+      status: "error",
+      message: "Terjadi kesalahan saat berkomunikasi dengan layanan lain.",
+      // Sertakan detail error dari layanan lain jika ada
+      details: err.response.data,
+    });
   }
 
+  // --- Penanganan Error Kustom (ResponseError & turunannya) ---
+  if (err instanceof ResponseError) {
+    return res.status(err.statusCode).json({
+      status: "error",
+      message: err.message,
+    });
+  }
+
+  // Penanganan Error Otentikasi
+  if (err instanceof JsonWebTokenError || err instanceof TokenExpiredError) {
+    let message = "Token tidak valid.";
+    if (err instanceof TokenExpiredError) {
+      message = "Token sudah kedaluwarsa.";
+    }
+    return res.status(401).json({
+      status: "error",
+      message: message,
+    });
+  }
+
+  // Penanganan Error Validasi dari Zod
   if (err instanceof ZodError) {
-    const errorMessages = err.issues.map((error) => ({
+    const errorMessages = err.errors.map((error) => ({
       field: error.path.join("."),
       message: error.message,
     }));
@@ -28,13 +52,7 @@ const errorMiddleware = (err, req, res, next) => {
     });
   }
 
-  if (err instanceof ResponseError) {
-    return res.status(err.statusCode).json({
-      status: "error",
-      message: err.message,
-    });
-  }
-
+  // --- Fallback untuk error yang tidak terduga ---
   return res.status(500).json({
     status: "error",
     message: "Terjadi kesalahan pada server.",
