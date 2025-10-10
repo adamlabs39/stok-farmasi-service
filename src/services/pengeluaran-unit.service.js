@@ -51,7 +51,7 @@ export default class PengeluaranUnitService {
       tanggal_pengeluaran: Date.now(),
       total_item: finalItems.length,
       total_harga: finalItems.reduce(
-        (sum, item) => sum + ((item.harga_satuan || 0) * item.qty),
+        (sum, item) => sum + (item.harga_satuan || 0) * item.qty,
         0
       ),
       petugas_pengeluaran: author.username,
@@ -68,12 +68,10 @@ export default class PengeluaranUnitService {
         enrichedData,
         transaction
       );
-      
 
       await transaction.commit();
 
       return result;
-      
     } catch (error) {
       // console.error("Error detail:", error);
       if (transaction) await transaction.rollback();

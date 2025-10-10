@@ -2,7 +2,7 @@ import { inventoryAPI, logger } from "../configurations/index.js";
 
 export default class InventoryService {
   static async reduceStock(dataPengeluaran, token) {
-    logger.info("Memulai proses pengurangan stok di Layanan Inventory...");
+  
     try {
       const apiCalls = dataPengeluaran.items.map((item) => {
         const payload = {
@@ -13,23 +13,14 @@ export default class InventoryService {
           sumber_mutasi: "pelayanan",
           kode_referensi: dataPengeluaran.no_pengeluaran,
         };
-        logger.info(
-          `Mengirim permintaan reduce stock untuk item: ${payload.item_uuid}, qty: ${payload.quantity}`
-        );
+       
         return inventoryAPI.post("/inventory/stok/reduce", payload, {
           headers: { Authorization: token },
         });
       });
       await Promise.all(apiCalls);
-      logger.info(
-        "Semua item berhasil dikurangi stoknya di Layanan Inventory."
-      );
+      
     } catch (error) {
-      logger.error(
-        "Gagal saat proses reduce stock di Layanan Inventory:",
-        error.response?.data || error.message
-      );
-
       throw error;
     }
   }

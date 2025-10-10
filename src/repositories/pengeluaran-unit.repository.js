@@ -108,41 +108,16 @@ export default class PengeluaranUnitRepository {
     );
     await Promise.all(stockUpdates);
   }
-  
+
   static async createPengeluaranUnit(data, transaction) {
     return PengeluaranUnitModel.create(data, {
       include: [
         {
           model: PengeluaranUnitItemModel,
-          as: "items", 
+          as: "items",
         },
       ],
       transaction,
     });
   }
-  
-  // static async createPengeluaranUnit(data, transaction) {
-  //   const pengeluaranUnit = await PengeluaranUnitModel.create(data, {
-  //     include: [{ model: PengeluaranUnitItemModel, as: "items" }],
-  //     transaction,
-  //   });
-  //   console.log("data pengeluaranUnit:", data);
-
-  //   const itemToCreate = data.item.map((item) => ({
-  //     ...item,
-  //     faskes_uuid: data.faskes_uuid,
-  //     pengeluaran_unit_uuid: pengeluaranUnit.uuid,
-  //   }));
-  //   console.log("Items to create:", itemToCreate);
-
-  //   await PengeluaranUnitItemModel.bulkCreate(itemToCreate, { transaction });
-  //   return pengeluaranUnit;
-  // }
-
-  // static async createPengeluaranUnit(data, transaction) {
-  //   return PengeluaranUnitModel.create(data, {
-  //     include: [{ model: PengeluaranUnitItemModel, as: "items" }],
-  //     transaction,
-  //   });
-  // }
 }
