@@ -40,6 +40,14 @@ export default class ReturUnitRepository {
     };
   }
 
+  static async findReturItemsByUuids(itemUuids) {
+    return await ReturUnitItemModel.findAll({
+      where: {
+        uuid: { [Op.in]: itemUuids },
+      },
+    });
+  }
+
   static async createReturUnit(data, transaction) {
     return ReturUnitModel.create(data, {
       include: [{ model: ReturUnitItemModel, as: "items" }],

@@ -6,18 +6,19 @@ import ReturUnitRepository from "../repositories/retur-unit.repository.js";
 import { ReturUnitValidation } from "../validations/retur-unit.validation.js";
 import ZodValidator from "../validations/zod.validation.js";
 import { v7 as uuidv7 } from "uuid";
+import InventoryService from "./inventory.service.js";
 
 export default class ReturUnitService {
-  static async createReturUnit(req) {
-    const transaction = await sequelize.transaction();
+  static async createReturUnit(data, author, token) {
+    let transaction;
     try {
       const validatedData = ZodValidator.validate(
         ReturUnitValidation.CREATE,
-        req.body
+        data
       );
 
-      const faskesUuid = req.author.faskesUuid;
-      const petugas = req.author.username;
+      const faskesUuid = author.faskesUuid;
+      const petugas = author.username;
 
       const totalHarga = validatedData.items.reduce((sum, item) => {
         return sum + item.qty * item.harga_satuan;
@@ -29,6 +30,8 @@ export default class ReturUnitService {
         faskes_uuid: faskesUuid,
         qty_terima: item.qty,
       }));
+
+      const jenis_stok_uuid = validatedData.jenis_stok_uuid;
 
       const enrichedData = {
         ...validatedData,
@@ -43,20 +46,25 @@ export default class ReturUnitService {
         items: itemsToCreate,
       };
 
+      await InventoryService.increaseStock(
+        enrichedData,
+        jenis_stok_uuid,
+        token
+      );
+
+      transaction = await sequelize.transaction();
+
       const result = await ReturUnitRepository.createReturUnit(
         enrichedData,
         transaction
       );
 
-      // TODO: Panggil API ke layanan inventory untuk melakukan mutasi stok
-      // 1. Kurangi stok dari lokasi_stok_awal_uuid
-      // 2. Tambah stok ke lokasi_stok_tujuan_uuid
-      // await InventoryService.mutasiStok(itemsToCreate, transaction);
-
       await transaction.commit();
       return result;
     } catch (error) {
-      await transaction.rollback();
+      if (transaction) {
+        await transaction.rollback();
+      }
       throw error;
     }
   }

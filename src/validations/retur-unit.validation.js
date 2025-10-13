@@ -16,6 +16,7 @@ const CREATE = z.object({
     required_error: "Kategori item wajib diisi",
   }),
   jenis_stok: z.string().nonempty({ message: "Jenis stok wajib diisi" }),
+  jenis_stok_uuid: z.string().uuid({ message: "Jenis stok UUID tidak valid" }),
   jenis_item: z.string().nonempty({ message: "Jenis item wajib diisi" }),
   lokasi_stok_awal_uuid: z
     .string()

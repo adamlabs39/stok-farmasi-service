@@ -4,7 +4,10 @@ import ReturUnitService from "../services/retur-unit.service.js";
 export default class ReturUnitController {
   static async createReturUnit(req, res, next) {
     try {
-      await ReturUnitService.createReturUnit(req);
+      const token = req.headers.authorization;
+      const author = req.author;
+      const data = req.body;
+      await ReturUnitService.createReturUnit(data, author, token);
 
       res.status(201).json(successResponse("Retur unit berhasil dibuat"));
     } catch (error) {
