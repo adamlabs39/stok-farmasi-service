@@ -5,6 +5,7 @@ import {
 import { getPagination, getPagingData } from "../helpers/pagination.helper.js";
 import { Op } from "sequelize";
 import { ItemMedisModel, LokasiStokModel } from "@adameds/model-sdk/farmasi";
+import NotFoundError from "../errors/NotFoundError.js";
 
 export default class ReturUnitRepository {
   static get _baseOptions() {
@@ -69,6 +70,14 @@ export default class ReturUnitRepository {
       whereClause.no_retur = { [Op.iLike]: `%${query.no_retur}%` };
     }
 
+    if (query.alasan_retur) {
+      const values = Array.isArray(query.alasan_retur)
+        ? query.alasan_retur
+        : String(query.alasan_retur).split(",").map((v) => v.trim()).filter(Boolean);
+
+      whereClause.alasan_retur = values.length > 1 ? { [Op.in]: values } : values[0];
+    }
+
     if (query.tujuan_retur) {
       const tujuanInclude = queryOptions.include.find(
         (inc) => inc.as === "lokasi_stok_tujuan"
@@ -90,6 +99,11 @@ export default class ReturUnitRepository {
       offset,
       distinct: true,
     });
+
+    const isSearching = query.no_retur || query.alasan_retur || query.tujuan_retur;
+    if (isSearching && result.count === 0) {
+      throw new NotFoundError(`Data retur unit tidak ditemukan.`);
+    }
 
     return getPagingData(result, page, pageSize);
   }

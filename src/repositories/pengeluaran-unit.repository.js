@@ -12,6 +12,7 @@ import {
 } from "@adameds/model-sdk/inventory";
 import { Op } from "sequelize";
 import { getPagination, getPagingData } from "../helpers/pagination.helper.js";
+import NotFoundError from "../errors/NotFoundError.js";
 
 export default class PengeluaranUnitRepository {
   static get _baseOptions() {
@@ -72,6 +73,13 @@ export default class PengeluaranUnitRepository {
       limit,
       offset,
     });
+
+    const isSearching = query.no_pengeluaran;
+    if (isSearching && result.count === 0) {
+      throw new NotFoundError(
+        `Data pengeluaran unit tidak ditemukan.`
+      );
+    }
 
     return getPagingData(result, page, pageSize);
   }

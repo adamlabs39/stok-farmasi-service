@@ -2,13 +2,13 @@ import { z } from "zod";
 
 const itemSchema = z.object({
   item_uuid: z
-    .string()
+    .string({ required_error: "item_uuid harus diisi." })
     .uuid({ message: "item_uuid harus berupa UUID yang valid." }),
   qty_permintaan: z
-    .number()
+    .number({ required_error: "qty_permintaan harus diisi." })
     .positive({ message: "qty_permintaan harus lebih besar dari 0." }),
   konversi_uuid: z
-    .string()
+    .string({ required_error: "konversi_uuid harus diisi." })
     .uuid({ message: "konversi_uuid harus berupa UUID yang valid." }),
   harga_satuan: z.number().positive().optional(),
 });
@@ -18,13 +18,13 @@ const createPermintaanUnitSchema = z.object({
     required_error: "kategori_item tidak boleh kosong.",
   }),
   jenis_stok_uuid: z
-    .string()
+    .string({ required_error: "jenis_stok_uuid harus diisi." })
     .uuid({ message: "jenis_stok_uuid harus berupa UUID yang valid." }),
   lokasi_stok_awal_uuid: z
-    .string()
+    .string({ required_error: "lokasi_stok_awal_uuid harus diisi." })
     .uuid({ message: "lokasi_stok_awal_uuid harus berupa UUID yang valid." }),
   lokasi_stok_tujuan_uuid: z
-    .string()
+    .string({ required_error: "lokasi_stok_tujuan_uuid harus diisi." })
     .uuid({ message: "lokasi_stok_tujuan_uuid harus berupa UUID yang valid." }),
   catatan: z.string().optional(),
   cito: z.boolean({ required_error: "cito tidak boleh kosong." }),

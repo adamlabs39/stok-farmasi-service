@@ -34,17 +34,17 @@ const errorMiddleware = (err, req, res, next) => {
     });
   }
 
-  if (err instanceof ZodError) {
-    const errorMessages = err.errors.map((error) => ({
-      field: error.path.join("."),
-      message: error.message,
-    }));
-    return res.status(400).json({
-      status: "error",
-      message: "Data yang dikirim tidak valid.",
-      errors: errorMessages,
-    });
-  }
+ if (err.name === "ZodError") {
+   const errorMessages = err.issues.map((issue) => ({
+     field: issue.path.join("."),
+     message: issue.message,
+   }));
+   return res.status(400).json({
+     status: "error",
+     message: "Data yang dikirim tidak valid.",
+     errors: errorMessages,
+   });
+ }
 
   // --- Fallback untuk error yang tidak terduga ---
   return res.status(500).json({

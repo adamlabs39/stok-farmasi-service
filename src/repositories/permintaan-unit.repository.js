@@ -69,7 +69,7 @@ export default class PermintaanUnitRepository {
 
     // pagination
     const { limit, offset, page, pageSize } = getPagination(query);
-
+   
     const result = await PermintaanUnitModel.findAndCountAll({
       where: whereClause,
       ...this._baseOptions,
@@ -77,7 +77,16 @@ export default class PermintaanUnitRepository {
       order: [["tanggal_permintaan", "DESC"]],
       limit,
       offset,
+      distinct: true,
     });
+
+     const isSearching =
+       query.no_permintaan || query.status || query.nama_lokasi_tujuan;
+     if (isSearching && result.count === 0) {
+       throw new NotFoundError(
+         `Data permintaan unit tidak ditemukan.`
+       );
+     }
 
     return getPagingData(result, page, pageSize);
   }
@@ -136,19 +145,28 @@ export default class PermintaanUnitRepository {
   ) {
     const permintaan = await PermintaanUnitModel.findOne({
       where: { uuid, faskes_uuid: faskesUuid },
-      attributes: ['status'],
-      transaction
+      attributes: ["status"],
+      transaction,
     });
 
     if (!permintaan) {
       throw new NotFoundError("Permintaan unit tidak ditemukan.");
     }
-    if(['cancel', 'dikirim']. includes(permintaan.status)) {
-      throw new ResponseError("Permintaan unit sudah dibatalkan atau dikirim, tidak bisa diubah statusnya.", 400);
+    if (["cancel", "dikirim"].includes(permintaan.status)) {
+      throw new ResponseError(
+        "Permintaan unit sudah dibatalkan atau dikirim, tidak bisa diubah statusnya.",
+        400
+      );
     }
 
-    if(dataToUpdate.status === 'cancel' && ['verified', 'verif_sebagian', 'dikirim'].includes(permintaan.status)) {
-      throw new ResponseError("Permintaan unit sudah diverifikasi atau dikirim, tidak bisa dibatalkan.", 400);
+    if (
+      dataToUpdate.status === "cancel" &&
+      ["verified", "verif_sebagian", "dikirim"].includes(permintaan.status)
+    ) {
+      throw new ResponseError(
+        "Permintaan unit sudah diverifikasi atau dikirim, tidak bisa dibatalkan.",
+        400
+      );
     }
 
     return PermintaanUnitModel.update(dataToUpdate, {

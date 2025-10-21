@@ -6,61 +6,84 @@ import ZodValidator from "../validations/zod.validation.js";
 import { generateNoPengeluaranUnit } from "../helpers/generator.helper.js";
 import PengeluaranUnitHelper from "../helpers/pengeluaran-unit.helper.js";
 import InventoryService from "./inventory.service.js";
+import ResponseError from "../errors/ResponseError.js";
 
 export default class PengeluaranUnitService {
   static async createPengeluaranUnit(data, author, token) {
+    console.log("Token di service:", token);
     let transaction;
-
-    const validatedData = ZodValidator.validate(
-      PengeluaranUnitValidation.CREATE,
-      data
-    );
-    const { items: itemsFromRequest } = validatedData;
-
-    const stockUuids = itemsFromRequest.map((item) => item.stock_uuid);
-    const stockDetailsFromDb =
-      await PengeluaranUnitRepository.findStokDetailsByUuids(stockUuids);
-
-    const stockMap = new Map(
-      stockDetailsFromDb.map((stock) => [stock.uuid, stock])
-    );
-
-    const finalItems = itemsFromRequest.map((item) => {
-      const stockDetail = stockMap.get(item.stock_uuid);
-      if (!stockDetail) {
-        throw new NotFoundError(
-          `Stok dengan UUID ${item.stock_uuid} tidak ditemukan.`
-        );
-      }
-      if (stockDetail.sisa_stok < item.qty) {
-        throw new BadRequestError(
-          `Sisa stok tidak mencukupi (Sisa: ${stockDetail.sisa_stok}, Diminta: ${item.qty})`
-        );
-      }
-      return {
-        ...item,
-        faskes_uuid: author.faskesUuid,
-        item_medis_uuid: stockDetail.item_medis_jenis_stok.item_medis_uuid,
-      };
-    });
-
-    const enrichedData = {
-      ...validatedData,
-      uuid: uuidv7(),
-      no_pengeluaran: generateNoPengeluaranUnit(),
-      tanggal_pengeluaran: Date.now(),
-      total_item: finalItems.length,
-      total_harga: finalItems.reduce(
-        (sum, item) => sum + (item.harga_satuan || 0) * item.qty,
-        0
-      ),
-      petugas_pengeluaran: author.username,
-      petugas_pengeluaran_uuid: author.username,
-      faskes_uuid: author.faskesUuid,
-      items: finalItems,
-    };
+    let inventoryReduced = false;
+    let inventoryIncreased = false;
     try {
+      const validatedData = ZodValidator.validate(
+        PengeluaranUnitValidation.CREATE,
+        data
+      );
+      console.log("Validated Data:", validatedData);
+      const { items: itemsFromRequest, jenis_pengeluaran } = validatedData;
+      const jenis_stok_uuid = validatedData.jenis_stok_uuid;
+      console.log("Jenis Stok UUID:", jenis_stok_uuid);
+      const stockUuids = itemsFromRequest.map((item) => item.stock_uuid);
+      const stockDetailsFromDb =
+        await PengeluaranUnitRepository.findStokDetailsByUuids(stockUuids);
+
+      const stockMap = new Map(
+        stockDetailsFromDb.map((stock) => [stock.uuid, stock])
+      );
+
+      const finalItems = itemsFromRequest.map((item) => {
+        const stockDetail = stockMap.get(item.stock_uuid);
+        if (!stockDetail) {
+          throw new NotFoundError(
+            `Stok dengan UUID ${item.stock_uuid} tidak ditemukan.`
+          );
+        }
+        if (stockDetail.sisa_stok < item.qty) {
+          throw new BadRequestError(
+            `Sisa stok tidak mencukupi (Sisa: ${stockDetail.sisa_stok}, Diminta: ${item.qty})`
+          );
+        }
+        return {
+          ...item,
+          faskes_uuid: author.faskesUuid,
+          item_medis_uuid: stockDetail.item_medis_jenis_stok.item_medis_uuid,
+        };
+      });
+
+      const enrichedData = {
+        ...validatedData,
+        uuid: uuidv7(),
+        no_pengeluaran: generateNoPengeluaranUnit(),
+        tanggal_pengeluaran: Date.now(),
+        total_item: finalItems.length,
+        total_harga: finalItems.reduce(
+          (sum, item) => sum + (item.harga_satuan || 0) * item.qty,
+          0
+        ),
+        petugas_pengeluaran: author.username,
+        petugas_pengeluaran_uuid: author.username,
+        faskes_uuid: author.faskesUuid,
+        items: finalItems,
+      };
+
+      console.log("Enriched Data:", enrichedData);
       await InventoryService.reduceStock(enrichedData, token);
+      inventoryReduced = true;
+
+      if (jenis_pengeluaran === "pengeluaran tanpa permintaan") {
+        if (!enrichedData.lokasi_stok_tujuan_uuid) {
+          throw new ResponseError(
+            "Lokasi stok tujuan harus diisi untuk pengeluaran tanpa permintaan.",
+            400
+          );
+        }
+        await InventoryService.increaseStock(
+          enrichedData,
+          jenis_stok_uuid,
+          token
+        );
+        inventoryIncreased = true;
+      }
 
       transaction = await sequelize.transaction();
 
@@ -73,7 +96,6 @@ export default class PengeluaranUnitService {
 
       return result;
     } catch (error) {
-      // console.error("Error detail:", error);
       if (transaction) await transaction.rollback();
       throw error;
     }

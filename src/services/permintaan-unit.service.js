@@ -7,6 +7,7 @@ import ZodValidator from "../validations/zod.validation.js";
 import PermintaanUnitHelper from "../helpers/permintaan-unit.helper.js";
 import NotFoundError from "../errors/NotFoundError.js";
 import ResponseError from "../errors/ResponseError.js";
+import InventoryService from "./inventory.service.js";
 
 export default class PermintaanUnitService {
   static async getAllPermintaanUnit(query, faskesUuid) {
@@ -100,15 +101,52 @@ export default class PermintaanUnitService {
     }
   }
 
-  static async updateStatusPenerimaan(uuid, faskesUuid, req) {
-    const transaction = await sequelize.transaction();
+  static async updateStatusPenerimaan(uuid, data, author, token) {
+    let transaction;
+    let inventoryReduced = false;
+    let originalPermintaan;
+
     try {
       const validatedData = ZodValidator.validate(
         PermintaanUnitValidation.UPDATE_STATUS,
-        req.body
+        data
       );
 
-      const petugas = req.author.username;
+      const { status } = validatedData;
+      const petugas = author.username;
+      const faskesUuid = author.faskesUuid;
+
+      originalPermintaan =
+        await PermintaanUnitRepository.getPermintaanUnitByUuid(
+          uuid,
+          faskesUuid
+        );
+
+      if (
+        !originalPermintaan ||
+        ["cancel", "dikirim"].includes(originalPermintaan.status)
+      ) {
+        throw new ResponseError(
+          "Permintaan unit tidak ditemukan atau sudah dibatalkan/dikirim.",
+          404
+        );
+      }
+
+      if (status === "dikirim") {
+        const dataForInventory = {
+          ...originalPermintaan.dataValues,
+          items: originalPermintaan.items.map((item) => ({
+            item_medis_uuid: item.item_uuid,
+            quantity: item.qty_permintaan,
+            jenis_stok_uuid: originalPermintaan.jenis_stok_uuid,
+          })),
+        };
+        console.log("Data for Inventory Reduction:", dataForInventory);
+        await InventoryService.reduceStock(dataForInventory, token);
+        inventoryReduced = true;
+      }
+
+      transaction = await sequelize.transaction();
 
       if (validatedData.status === "verif_sebagian") {
         const originalPermintaan =
@@ -116,15 +154,6 @@ export default class PermintaanUnitService {
             uuid,
             faskesUuid
           );
-        if (
-          !originalPermintaan ||
-          ["cancel", "dikirim"].includes(originalPermintaan.status)
-        ) {
-          throw new ResponseError(
-            "Permintaan unit tidak ditemukan atau sudah dibatalkan/dikirim.",
-            400
-          );
-        }
 
         const leftoverItems = [];
         const itemsToUpdate = [];
@@ -203,19 +232,17 @@ export default class PermintaanUnitService {
           );
         }
       } else {
-        const dataToUpdate = {
-          status: validatedData.status,
-        };
+        const dataToUpdate = { status };
 
         if (validatedData.status === "verified") {
           dataToUpdate.petugas_verifikasi = petugas;
           dataToUpdate.catatan_verifikasi =
             validatedData.catatan_verifikasi || null;
-        }else if (validatedData.status === "dikirim") {
-          dataToUpdate.petugas_pengiriman = petugas; 
-          dataToUpdate.catatan_pengiriman =validatedData.catatan_pengiriman || null;
-        }
-        else if (validatedData.status === "cancel") {
+        } else if (validatedData.status === "dikirim") {
+          dataToUpdate.petugas_pengiriman = petugas;
+          dataToUpdate.catatan_pengiriman =
+            validatedData.catatan_pengiriman || null;
+        } else if (validatedData.status === "cancel") {
           dataToUpdate.alasan_batal = validatedData.alasan_batal || null;
         }
 
@@ -236,7 +263,41 @@ export default class PermintaanUnitService {
 
       await transaction.commit();
     } catch (error) {
-      await transaction.rollback();
+      if (transaction) {
+        await transaction.rollback();
+      }
+      if (inventoryReduced) {
+        logger.warn(
+          `Memulai kompensasi (menambah stok) di Inventory untuk permintaan ${
+            originalPermintaan?.no_permintaan || uuid
+          }...`
+        );
+        try {
+          const compensationData = {
+            ...originalPermintaan.dataValues,
+            items: originalPermintaan.items.map((item) => ({
+              item_medis_uuid: item.item_uuid,
+              qty: item.qty_pengiriman,
+              jenis_stok_uuid: originalPermintaan.jenis_stok_uuid,
+            })),
+          };
+          InventoryService.increaseStock(
+            compensationData,
+            "kompensasi pengiriman",
+            token
+          ).catch((compError) =>
+            logger.error(
+              `!!! KRITIS: Gagal melakukan kompensasi stok di Inventory:`,
+              compError.response?.data || compError.message
+            )
+          );
+        } catch (compError) {
+          logger.error(
+            `!!! KRITIS: Error saat persiapan kompensasi stok:`,
+            compError
+          );
+        }
+      }
       throw error;
     }
   }

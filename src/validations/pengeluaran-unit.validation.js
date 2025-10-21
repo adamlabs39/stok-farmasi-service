@@ -6,6 +6,7 @@ const itemSchema = z.object({
   harga_satuan: z
     .number()
     .nonnegative({ message: "Harga satuan tidak boleh negatif" }),
+  exp_date: z.string().nonempty({ message: "Tanggal kedaluwarsa wajib diisi" }),
   konversi_uuid: z.string().uuid({ message: "Konversi UUID tidak valid" }),
 });
 
@@ -19,14 +20,14 @@ const CREATE = z
       required_error: "Kategori item wajib diisi",
     }),
     jenis_stok_uuid: z
-      .string()
+      .string({required_error: "Jenis stok wajib diisi" })
       .uuid({ message: "Jenis stok UUID tidak valid" }),
     jenis_item: z.string({ required_error: "Jenis item wajib diisi" }),
     lokasi_stok_awal_uuid: z
-      .string()
+      .string({ required_error: "Lokasi stok awal wajib diisi" })
       .uuid({ message: "Lokasi stok awal UUID tidak valid" }),
     lokasi_stok_tujuan_uuid: z
-      .string()
+      .string({ required_error: "Lokasi stok tujuan wajib diisi" })
       .uuid({ message: "Lokasi stok tujuan UUID tidak valid" })
       .optional(),
     catatan: z.string().optional(),
