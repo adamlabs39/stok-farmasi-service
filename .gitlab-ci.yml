@@ -1,0 +1,28 @@
+stages:
+  - build-deploy
+
+build-deploy:
+  stage: build-deploy
+  tags:
+    - development
+  only:
+    - dev-deployment
+  before_script:
+    - git config --global --add safe.directory "$CI_PROJECT_DIR"
+    - echo "@adameds:registry=https://gitlab.com/api/v4/groups/93029767/-/packages/npm/" >> .npmrc
+    - echo "//gitlab.com/api/v4/groups/93029767/-/packages/npm/:_authToken=$AUTH_TOKEN" >> .npmrc
+  script:
+    - docker compose --env-file /home/env/.env.datamaster up --build -d
+
+
+build-staging:
+  stage: build-deploy
+  tags:
+    - staging
+  only:
+    - staging
+  before_script:
+    - echo "@adameds:registry=https://gitlab.com/api/v4/groups/93029767/-/packages/npm/" >> .npmrc
+    - echo "//gitlab.com/api/v4/groups/93029767/-/packages/npm/:_authToken=$AUTH_TOKEN" >> .npmrc
+  script:
+    - docker compose --env-file /home/env/.env.datamaster up --build -d

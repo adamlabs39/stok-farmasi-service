@@ -1,0 +1,21 @@
+services:
+  stok-farmasi:
+    container_name: api-adameds-stock-farmasi
+    image: adameds/stok-farmasi:dev
+    build:
+      context: ./
+      dockerfile: Dockerfile
+      no_cache: true
+    ports: ["3001:3001"]
+    environment:
+      INFISICAL_TOKEN: ${INFISICAL_TOKEN}
+      API_BASE: ${API_BASE}
+      API_VERSION: ${API_VERSION}
+      REKAM_MEDIS_URL: ${REKAM_MEDIS_URL}
+      INVENTORY_URL: ${INVENTORY_URL}
+    restart: always
+    networks: [datamaster-bridge]
+
+networks:
+  datamaster-bridge:
+    driver: bridge
