@@ -6,5 +6,6 @@ ENV APPLICATION_HOST=0.0.0.0
 
 COPY . .
 RUN npm install
+RUN npm install -g @infisical/cli
 EXPOSE $APPLICATION_PORT/tcp
-CMD ["npm", "run", "start"]
+CMD ["sh", "-c", "infisical run --env=staging -- npm run start"]
