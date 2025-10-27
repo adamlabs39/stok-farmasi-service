@@ -12,15 +12,15 @@ export default class PengeluaranUnitService {
   static async createPengeluaranUnit(data, author, token) {
     console.log("Token di service:", token);
     let transaction;
-    let inventoryReduced = false;
-    let inventoryIncreased = false;
+    let inventoryUpdated = false;
+
     try {
       const validatedData = ZodValidator.validate(
         PengeluaranUnitValidation.CREATE,
         data
       );
       console.log("Validated Data:", validatedData);
-      const { items: itemsFromRequest, jenis_pengeluaran } = validatedData;
+      const { items: itemsFromRequest } = validatedData;
       const jenis_stok_uuid = validatedData.jenis_stok_uuid;
       console.log("Jenis Stok UUID:", jenis_stok_uuid);
       const stockUuids = itemsFromRequest.map((item) => item.stock_uuid);
@@ -67,23 +67,8 @@ export default class PengeluaranUnitService {
       };
 
       console.log("Enriched Data:", enrichedData);
-      await InventoryService.reduceStock(enrichedData, token);
-      inventoryReduced = true;
-
-      if (jenis_pengeluaran === "pengeluaran tanpa permintaan") {
-        if (!enrichedData.lokasi_stok_tujuan_uuid) {
-          throw new ResponseError(
-            "Lokasi stok tujuan harus diisi untuk pengeluaran tanpa permintaan.",
-            400
-          );
-        }
-        await InventoryService.increaseStock(
-          enrichedData,
-          jenis_stok_uuid,
-          token
-        );
-        inventoryIncreased = true;
-      }
+      await InventoryService.catatPengeluaranUnit(enrichedData, token);
+      inventoryUpdated = true;
 
       transaction = await sequelize.transaction();
 

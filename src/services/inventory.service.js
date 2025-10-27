@@ -1,54 +1,58 @@
 import { inventoryAPI, logger } from "../configurations/index.js";
 
 export default class InventoryService {
-  static async reduceStock(dataMutasi, token) {
-    try {
-      const apiCalls = dataMutasi.items.map((item) => {
-        const isPermintaan = !!dataMutasi.no_permintaan;
-        const payload = {
-          jenis_stok_uuid: dataMutasi.jenis_stok_uuid,
-          item_uuid: item.item_medis_uuid,
-          quantity: item.qty || item.quantity,
-          lokasi_stok_uuid: isPermintaan
-            ? dataMutasi.lokasi_stok_tujuan_uuid
-            : dataMutasi.lokasi_stok_awal_uuid,
-          sumber_mutasi: "pelayanan",
-          kode_referensi: isPermintaan
-            ? dataMutasi.no_permintaan
-            : dataMutasi.no_pengeluaran,
-        };
-        console.log("Reduce Stock Payload:", payload);
-        return inventoryAPI.post("/inventory/stok/reduce", payload, {
-          headers: { Authorization: token },
-        });
-      });
-      await Promise.all(apiCalls);
-    } catch (error) {
-      throw error;
-    }
-  }
+  static async catatPengeluaranUnit(dataMutasi, token) {
+    logger.info(
+      `Mencatat pengeluaran unit di Inventory: ${dataMutasi.no_pengeluaran}`
+    );
 
-  static async increaseStock(dataRetur, jenis_stok_uuid, token) {
+    const payload = {
+      jenis_pengeluaran: dataMutasi.jenis_pengeluaran,
+      jenis_item: dataMutasi.jenis_item,
+      kategori_item: dataMutasi.kategori_item,
+      jenis_stok_uuid: dataMutasi.jenis_stok_uuid,
+      lokasi_stok_awal_uuid: dataMutasi.lokasi_stok_awal_uuid,
+      tanggal_pengeluaran: dataMutasi.tanggal_pengeluaran,
+      items: dataMutasi.items.map((item) => ({
+        stock_uuid: item.stock_uuid,
+        exp_date: item.exp_date,
+        harga_satuan: item.harga_satuan,
+        konversi_uuid: item.konversi_uuid,
+        qty: item.qty,
+      })),
+    };
+
+    if (dataMutasi.jenis_pengeluaran === "pengeluaran tanpa permintaan") {
+      if (!dataMutasi.lokasi_stok_tujuan_uuid) {
+        throw new BadRequestError(
+          "Lokasi stok tujuan wajib diisi untuk jenis 'pengeluaran tanpa permintaan'."
+        );
+      }
+      payload.lokasi_stok_tujuan_uuid = dataMutasi.lokasi_stok_tujuan_uuid;
+    } else if (dataMutasi.jenis_pengeluaran === "pemusnahan barang") {
+      if (!dataMutasi.jenis_pemusnahan) {
+        throw new BadRequestError(
+          "Jenis pemusnahan wajib diisi untuk 'pemusnahan barang'."
+        );
+      }
+      payload.jenis_pemusnahan = dataMutasi.jenis_pemusnahan;
+    }
+
     try {
-      const payload = {
-        sumber_mutasi: "pelayanan",
-        kode_referensi: dataRetur.no_retur || dataRetur.no_pengeluaran,
-        items: dataRetur.items.map((item) => ({
-          item_uuid: item.item_uuid || item.item_medis_uuid,
-          lokasi_stok_uuid: dataRetur.lokasi_stok_tujuan_uuid,
-          jenis_stok_uuid: jenis_stok_uuid,
-          quantity: item.qty_terima || item.qty,
-          exp_date: item.exp_date,
-          harga_satuan: item.harga_satuan,
-        })),
-      };
-      console.log("Increase Stock Payload:", payload);
-      await inventoryAPI.post("/inventory/stok/increase", payload, {
+      await inventoryAPI.post("/inventory/pengeluaran-unit", payload, {
         headers: { Authorization: token },
       });
+      logger.info(
+        `Pengeluaran unit ${dataMutasi.no_pengeluaran} berhasil dicatat di Inventory.`
+      );
     } catch (error) {
-      logger.error("Error increasing stock:", error);
-      throw error;
+      logger.error(
+        `Gagal mencatat pengeluaran unit di Inventory:`,
+        error.response?.data || error.message
+      );
+      throw new BadRequestError(
+        "Gagal mencatat pengeluaran di layanan inventory."
+      );
     }
   }
 }
