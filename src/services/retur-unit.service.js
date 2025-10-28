@@ -6,7 +6,14 @@ import ReturUnitRepository from "../repositories/retur-unit.repository.js";
 import { ReturUnitValidation } from "../validations/retur-unit.validation.js";
 import ZodValidator from "../validations/zod.validation.js";
 import { v7 as uuidv7 } from "uuid";
-import InventoryService from "./inventory.service.js";
+// import InventoryService from "./inventory.service.js";
+import KonfigurasiHargaRepository from "../repositories/konfigurasi-harga-repository.js";
+import {
+  ItemMedisJenisStokModel,
+  ItemMedisModel,
+} from "@adameds/model-sdk/farmasi";
+import StockMedisRepository from "../repositories/stock-medis-repository.js";
+import { StockMedisModel } from "@adameds/model-sdk/inventory";
 
 export default class ReturUnitService {
   static async createReturUnit(data, author, token) {
@@ -19,45 +26,142 @@ export default class ReturUnitService {
 
       const faskesUuid = author.faskesUuid;
       const petugas = author.username;
+      const {
+        lokasi_stok_awal_uuid,
+        lokasi_stok_tujuan_uuid,
+        jenis_stok_uuid,
+      } = validatedData;
 
-      const totalHarga = validatedData.items.reduce((sum, item) => {
-        return sum + item.qty * item.harga_satuan;
-      }, 0);
+      const configInfo = await KonfigurasiHargaRepository.get(faskesUuid);
+      const metode_pemotongan_stok =
+        configInfo?.metode_pemotongan_stok || "FIFO";
+
+      transaction = await sequelize.transaction();
+
+      const totalHarga = validatedData.items.reduce(
+        (sum, item) => sum + item.qty * item.harga_satuan,
+        0
+      );
+      const returUuid = uuidv7();
 
       const itemsToCreate = validatedData.items.map((item) => ({
         ...item,
         uuid: uuidv7(),
         faskes_uuid: faskesUuid,
         qty_terima: item.qty,
+        retur_unit_uuid: returUuid,
       }));
-
-      const jenis_stok_uuid = validatedData.jenis_stok_uuid;
 
       const enrichedData = {
         ...validatedData,
-        uuid: uuidv7(),
+        uuid: returUuid,
         no_retur: generateNoReturUnit(),
         tanggal_retur: Date.now(),
         total_item: validatedData.items.length,
         total_harga: totalHarga,
         petugas_retur: petugas,
-        petugas_retur_uuid: petugas,
+        petugas_retur_uuid: author.user_uuid,
         faskes_uuid: faskesUuid,
         items: itemsToCreate,
       };
-
-      await InventoryService.increaseStock(
-        enrichedData,
-        jenis_stok_uuid,
-        token
-      );
-
-      transaction = await sequelize.transaction();
 
       const result = await ReturUnitRepository.createReturUnit(
         enrichedData,
         transaction
       );
+
+      for (const item of itemsToCreate) {
+        const itemDetail = await ItemMedisModel.findByPk(item.item_uuid, {
+          transaction,
+        });
+        const nama_item = itemDetail ? itemDetail.name : "Unknown Item";
+
+        const catatanStokBerkurang = await StockMedisRepository.reduceQuantity(
+          {
+            item_medis_uuid: item.item_uuid,
+            jenis_stok_uuid: jenis_stok_uuid,
+            quantity: item.qty,
+            metode_pemotongan_stok: metode_pemotongan_stok,
+            lokasi_stok_uuid: lokasi_stok_awal_uuid,
+            name: nama_item,
+          },
+          transaction
+        );
+
+        for (const catatan of catatanStokBerkurang) {
+          const sourceStockBatch = await StockMedisModel.findByPk(
+            catatan.stock_medis_uuid,
+            {
+              transaction,
+              include: [
+                { model: ItemMedisJenisStokModel, as: "item_medis_jenis_stok" },
+              ],
+            }
+          );
+
+          const destinationStockBatch =
+            await StockMedisRepository.findOrCreateAndIncreaseStock(
+              {
+                itemMedisJenisStokUuid:
+                  sourceStockBatch.item_medis_jenis_stok_uuid,
+                exp_date: sourceStockBatch.exp_date,
+                harga_satuan: sourceStockBatch.harga_satuan,
+                konversi_uuid: sourceStockBatch.konversi_uuid,
+                no_po: sourceStockBatch.no_po,
+                quantity: catatan.quantity,
+              },
+              lokasi_stok_tujuan_uuid,
+              faskesUuid,
+              transaction
+            );
+
+          await StockMedisRepository.createRiwayatMutasi(
+            {
+              uuid: uuidv7(),
+              faskes_uuid: faskesUuid,
+              item_uuid: item.item_uuid,
+              code: enrichedData.no_retur,
+              exp_date: sourceStockBatch.exp_date,
+              lokasi_stok_uuid: lokasi_stok_awal_uuid,
+              jenis_stok_uuid: jenis_stok_uuid,
+              keterangan: {
+                description: `Retur unit ke ${lokasi_stok_tujuan_uuid} (Item: ${nama_item})`,
+              },
+              petugas: petugas,
+              stok_awal: catatan.stock_before,
+              stok_mutasi: catatan.quantity,
+              sumber_mutasi: "inventory",
+              type: "defisit",
+              created_at: Date.now(),
+              updated_at: Date.now(),
+            },
+            transaction
+          );
+
+          await StockMedisRepository.createRiwayatMutasi(
+            {
+              uuid: uuidv7(),
+              faskes_uuid: faskesUuid,
+              item_uuid: item.item_uuid,
+              code: enrichedData.no_retur,
+              exp_date: destinationStockBatch.exp_date,
+              lokasi_stok_uuid: lokasi_stok_tujuan_uuid,
+              jenis_stok_uuid: jenis_stok_uuid,
+              keterangan: {
+                description: `Retur unit dari ${lokasi_stok_awal_uuid} (Item: ${nama_item})`,
+              },
+              petugas: petugas,
+              stok_awal: destinationStockBatch.sisa_stok - catatan.quantity,
+              stok_mutasi: catatan.quantity,
+              sumber_mutasi: "inventory",
+              type: "surplus",
+              created_at: Date.now(),
+              updated_at: Date.now(),
+            },
+            transaction
+          );
+        }
+      }
 
       await transaction.commit();
       return result;
