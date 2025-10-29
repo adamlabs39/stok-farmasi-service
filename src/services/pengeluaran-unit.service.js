@@ -10,7 +10,6 @@ import ResponseError from "../errors/ResponseError.js";
 
 export default class PengeluaranUnitService {
   static async createPengeluaranUnit(data, author, token) {
-    console.log("Token di service:", token);
     let transaction;
     let inventoryUpdated = false;
 
@@ -19,10 +18,8 @@ export default class PengeluaranUnitService {
         PengeluaranUnitValidation.CREATE,
         data
       );
-      console.log("Validated Data:", validatedData);
       const { items: itemsFromRequest } = validatedData;
       const jenis_stok_uuid = validatedData.jenis_stok_uuid;
-      console.log("Jenis Stok UUID:", jenis_stok_uuid);
       const stockUuids = itemsFromRequest.map((item) => item.stock_uuid);
       const stockDetailsFromDb =
         await PengeluaranUnitRepository.findStokDetailsByUuids(stockUuids);
@@ -34,13 +31,13 @@ export default class PengeluaranUnitService {
       const finalItems = itemsFromRequest.map((item) => {
         const stockDetail = stockMap.get(item.stock_uuid);
         if (!stockDetail) {
-          throw new NotFoundError(
-            `Stok dengan UUID ${item.stock_uuid} tidak ditemukan.`
+          throw new ResponseError(
+            `Stok dengan UUID ${item.stock_uuid} tidak ditemukan.`, 400
           );
         }
         if (stockDetail.sisa_stok < item.qty) {
-          throw new BadRequestError(
-            `Sisa stok tidak mencukupi (Sisa: ${stockDetail.sisa_stok}, Diminta: ${item.qty})`
+          throw new ResponseError(
+            `Sisa stok tidak mencukupi (Sisa: ${stockDetail.sisa_stok}, Diminta: ${item.qty})`, 400
           );
         }
         return {
@@ -66,7 +63,6 @@ export default class PengeluaranUnitService {
         items: finalItems,
       };
 
-      console.log("Enriched Data:", enrichedData);
       await InventoryService.catatPengeluaranUnit(enrichedData, token);
       inventoryUpdated = true;
 

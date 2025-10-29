@@ -1,10 +1,8 @@
 import { inventoryAPI, logger } from "../configurations/index.js";
+import ResponseError from "../errors/ResponseError.js";
 
 export default class InventoryService {
   static async catatPengeluaranUnit(dataMutasi, token) {
-    logger.info(
-      `Mencatat pengeluaran unit di Inventory: ${dataMutasi.no_pengeluaran}`
-    );
 
     const payload = {
       jenis_pengeluaran: dataMutasi.jenis_pengeluaran,
@@ -24,15 +22,15 @@ export default class InventoryService {
 
     if (dataMutasi.jenis_pengeluaran === "pengeluaran tanpa permintaan") {
       if (!dataMutasi.lokasi_stok_tujuan_uuid) {
-        throw new BadRequestError(
-          "Lokasi stok tujuan wajib diisi untuk jenis 'pengeluaran tanpa permintaan'."
+        throw new ResponseError(
+          `Lokasi stok tujuan wajib diisi untuk jenis 'pengeluaran tanpa permintaan'.`, 400
         );
       }
       payload.lokasi_stok_tujuan_uuid = dataMutasi.lokasi_stok_tujuan_uuid;
     } else if (dataMutasi.jenis_pengeluaran === "pemusnahan barang") {
       if (!dataMutasi.jenis_pemusnahan) {
-        throw new BadRequestError(
-          "Jenis pemusnahan wajib diisi untuk 'pemusnahan barang'."
+        throw new ResponseError(
+          `Jenis pemusnahan wajib diisi untuk 'pemusnahan barang'.`, 400
         );
       }
       payload.jenis_pemusnahan = dataMutasi.jenis_pemusnahan;
@@ -42,16 +40,56 @@ export default class InventoryService {
       await inventoryAPI.post("/inventory/pengeluaran-unit", payload, {
         headers: { Authorization: token },
       });
-      logger.info(
-        `Pengeluaran unit ${dataMutasi.no_pengeluaran} berhasil dicatat di Inventory.`
-      );
     } catch (error) {
-      logger.error(
-        `Gagal mencatat pengeluaran unit di Inventory:`,
-        error.response?.data || error.message
+      throw new ResponseError(
+        `Gagal mencatat pengeluaran di layanan inventory.`, 500
       );
-      throw new BadRequestError(
-        "Gagal mencatat pengeluaran di layanan inventory."
+    }
+  }
+
+  static async verifikasiPengiriman(permintaanUuid, body, token) {
+    try {
+      const response = await inventoryAPI.put(
+        `/inventory/pengiriman-unit/verifikasi/${permintaanUuid}`,
+        body,
+        {
+          headers: { Authorization: token },
+        }
+      );
+      return response.data.payload;
+    } catch (error) {
+      throw new ResponseError(
+        `Gagal verifikasi pengiriman di layanan inventory.`, 500
+      );
+    }
+  }
+
+  static async kirimPengiriman(permintaanUuid, body, token) {
+    try {
+      const response = await inventoryAPI.put(
+        `/inventory/pengiriman-unit/kirim/${permintaanUuid}`,
+        body,
+        {
+          headers: { Authorization: token },
+        }
+      );
+      return response.data.payload;
+    } catch (error) {
+      throw new ResizeObserver(`Gagal kirim pengiriman di layanan inventory.`, 500);
+    }
+  }
+
+  static async batalPengiriman(permintaanUuid, body, token) {
+    try {
+      const response = await inventoryAPI.put(
+        `/inventory/pengiriman-unit/batal/${permintaanUuid}`,
+        body,
+        { headers: { Authorization: token } }
+      );
+      return response.data.payload || { message: "Pembatalan berhasil" };
+    } catch (error) {
+      throw new ResponseError(
+        `Gagal membatalkan pengiriman di layanan inventory.`, 500
       );
     }
   }
