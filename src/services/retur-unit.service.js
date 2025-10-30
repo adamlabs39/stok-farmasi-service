@@ -6,14 +6,9 @@ import ReturUnitRepository from "../repositories/retur-unit.repository.js";
 import { ReturUnitValidation } from "../validations/retur-unit.validation.js";
 import ZodValidator from "../validations/zod.validation.js";
 import { v7 as uuidv7 } from "uuid";
-// import InventoryService from "./inventory.service.js";
 import KonfigurasiHargaRepository from "../repositories/konfigurasi-harga-repository.js";
-import {
-  ItemMedisJenisStokModel,
-  ItemMedisModel,
-} from "@adameds/model-sdk/farmasi";
+import { ItemMedisModel } from "@adameds/model-sdk/farmasi";
 import StockMedisRepository from "../repositories/stock-medis-repository.js";
-import { StockMedisModel } from "@adameds/model-sdk/inventory";
 
 export default class ReturUnitService {
   static async createReturUnit(data, author, token) {
@@ -89,15 +84,17 @@ export default class ReturUnitService {
         );
 
         for (const catatan of catatanStokBerkurang) {
-          const sourceStockBatch = await StockMedisModel.findByPk(
-            catatan.stock_medis_uuid,
-            {
-              transaction,
-              include: [
-                { model: ItemMedisJenisStokModel, as: "item_medis_jenis_stok" },
-              ],
-            }
-          );
+          const sourceStockBatch =
+            await StockMedisRepository.findStockByIdWithRelations(
+              catatan.stock_medis_uuid,
+              transaction
+            );
+
+          if (!sourceStockBatch) {
+            throw new NotFoundError(
+              `Stok batch ${catatan.stock_medis_uuid} tidak ditemukan saat retur.`
+            );
+          }
 
           const destinationStockBatch =
             await StockMedisRepository.findOrCreateAndIncreaseStock(
@@ -132,8 +129,6 @@ export default class ReturUnitService {
               stok_mutasi: catatan.quantity,
               sumber_mutasi: "inventory",
               type: "defisit",
-              created_at: Date.now(),
-              updated_at: Date.now(),
             },
             transaction
           );
@@ -155,8 +150,6 @@ export default class ReturUnitService {
               stok_mutasi: catatan.quantity,
               sumber_mutasi: "inventory",
               type: "surplus",
-              created_at: Date.now(),
-              updated_at: Date.now(),
             },
             transaction
           );

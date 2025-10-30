@@ -73,9 +73,13 @@ export default class ReturUnitRepository {
     if (query.alasan_retur) {
       const values = Array.isArray(query.alasan_retur)
         ? query.alasan_retur
-        : String(query.alasan_retur).split(",").map((v) => v.trim()).filter(Boolean);
+        : String(query.alasan_retur)
+            .split(",")
+            .map((v) => v.trim())
+            .filter(Boolean);
 
-      whereClause.alasan_retur = values.length > 1 ? { [Op.in]: values } : values[0];
+      whereClause.alasan_retur =
+        values.length > 1 ? { [Op.in]: values } : values[0];
     }
 
     if (query.tujuan_retur) {
@@ -100,7 +104,8 @@ export default class ReturUnitRepository {
       distinct: true,
     });
 
-    const isSearching = query.no_retur || query.alasan_retur || query.tujuan_retur;
+    const isSearching =
+      query.no_retur || query.alasan_retur || query.tujuan_retur;
     if (isSearching && result.count === 0) {
       throw new NotFoundError(`Data retur unit tidak ditemukan.`);
     }
@@ -113,5 +118,9 @@ export default class ReturUnitRepository {
       where: { uuid, faskes_uuid: faskesUuid },
       ...this._baseOptions,
     });
+  }
+
+  static async getItemById(uuid, options = {}) {
+    return await ItemMedisModel.findByPk(uuid, options);
   }
 }

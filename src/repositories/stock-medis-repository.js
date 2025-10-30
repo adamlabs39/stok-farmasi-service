@@ -124,6 +124,55 @@ export default class StockMedisRepository {
     return result;
   }
 
+  static async addQuantity(req, transaction) {
+    const stock = await StockMedisModel.findOne({
+      where: {
+        uuid: req.stock_medis_uuid,
+      },
+      transaction,
+      lock: transaction.LOCK.UPDATE,
+    });
+
+    if (!stock) {
+      throw new NotFoundError(
+        `Stok batch ${req.stock_medis_uuid} tidak ditemukan untuk dikembalikan.`
+      );
+    }
+
+    await stock.increment("sisa_stok", { by: req.quantity, transaction });
+
+    return stock;
+  }
+
+  static async findStokDetailsByUuids(stockUuids) {
+    return await StockMedisModel.findAll({
+      where: { uuid: { [Op.in]: stockUuids } },
+      include: [
+        {
+          model: ItemMedisJenisStokModel,
+          as: "item_medis_jenis_stok",
+          required: true,
+          include: [
+            {
+              model: ItemMedisModel,
+              as: "item_medis",
+              required: true,
+            },
+          ],
+        },
+      ],
+    });
+  }
+
+  static async findStockByIdWithRelations(uuid, transaction) {
+    return await StockMedisModel.findByPk(uuid, {
+      transaction,
+      include: [
+        { model: ItemMedisJenisStokModel, as: "item_medis_jenis_stok" },
+      ],
+    });
+  }
+
   static async findOrCreateAndIncreaseStock(
     {
       itemMedisJenisStokUuid,
@@ -173,45 +222,5 @@ export default class StockMedisRepository {
 
   static async createRiwayatMutasi(data, transaction) {
     return RiwayatMutasiModel.create(data, { transaction });
-  }
-
-  static async addQuantity(req, transaction) {
-    const stock = await StockMedisModel.findOne({
-      where: {
-        uuid: req.stock_medis_uuid,
-      },
-      transaction,
-      lock: transaction.LOCK.UPDATE,
-    });
-
-    if (!stock) {
-      throw new NotFoundError(
-        `Stok batch ${req.stock_medis_uuid} tidak ditemukan untuk dikembalikan.`
-      );
-    }
-
-    await stock.increment("sisa_stok", { by: req.quantity, transaction });
-
-    return stock;
-  }
-
-  static async findStokDetailsByUuids(stockUuids) {
-    return await StockMedisModel.findAll({
-      where: { uuid: { [Op.in]: stockUuids } },
-      include: [
-        {
-          model: ItemMedisJenisStokModel,
-          as: "item_medis_jenis_stok",
-          required: true,
-          include: [
-            {
-              model: ItemMedisModel,
-              as: "item_medis",
-              required: true,
-            },
-          ],
-        },
-      ],
-    });
   }
 }
