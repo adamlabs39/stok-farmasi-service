@@ -10,16 +10,13 @@ import ResponseError from "../errors/ResponseError.js";
 
 export default class PengeluaranUnitService {
   static async createPengeluaranUnit(data, author, token) {
-    let transaction;
-    let inventoryUpdated = false;
-
     try {
       const validatedData = ZodValidator.validate(
         PengeluaranUnitValidation.CREATE,
         data
       );
       const { items: itemsFromRequest } = validatedData;
-      const jenis_stok_uuid = validatedData.jenis_stok_uuid;
+      // const jenis_stok_uuid = validatedData.jenis_stok_uuid;
       const stockUuids = itemsFromRequest.map((item) => item.stock_uuid);
       const stockDetailsFromDb =
         await PengeluaranUnitRepository.findStokDetailsByUuids(stockUuids);
@@ -32,12 +29,14 @@ export default class PengeluaranUnitService {
         const stockDetail = stockMap.get(item.stock_uuid);
         if (!stockDetail) {
           throw new ResponseError(
-            `Stok dengan UUID ${item.stock_uuid} tidak ditemukan.`, 400
+            `Stok dengan UUID ${item.stock_uuid} tidak ditemukan.`,
+            400
           );
         }
         if (stockDetail.sisa_stok < item.qty) {
           throw new ResponseError(
-            `Sisa stok tidak mencukupi (Sisa: ${stockDetail.sisa_stok}, Diminta: ${item.qty})`, 400
+            `Sisa stok tidak mencukupi (Sisa: ${stockDetail.sisa_stok}, Diminta: ${item.qty})`,
+            400
           );
         }
         return {
@@ -58,26 +57,15 @@ export default class PengeluaranUnitService {
           0
         ),
         petugas_pengeluaran: author.username,
-        petugas_pengeluaran_uuid: author.username,
+        petugas_pengeluaran_uuid: author.user_uuid,
         faskes_uuid: author.faskesUuid,
         items: finalItems,
       };
 
       await InventoryService.catatPengeluaranUnit(enrichedData, token);
-      inventoryUpdated = true;
 
-      transaction = await sequelize.transaction();
-
-      const result = await PengeluaranUnitRepository.createPengeluaranUnit(
-        enrichedData,
-        transaction
-      );
-
-      await transaction.commit();
-
-      return result;
+      return enrichedData;
     } catch (error) {
-      if (transaction) await transaction.rollback();
       throw error;
     }
   }
