@@ -1,6 +1,7 @@
 import express from "express";
 import PermintaanUnitController from "../controller/permintaan-unit.controller.js";
 import PengeluaranUnitController from "../controller/pengeluaran-unit.controller.js";
+import ReturUnitController from "../controller/retur-unit.controller.js";
 
 const apiBase = process.env.API_BASE || "api";
 const apiVersion = process.env.API_VERSION || "v1";
@@ -25,6 +26,11 @@ routes.post(`${baseUrl}/pengeluaran-unit`, PengeluaranUnitController.createPenge
 routes.get(`${baseUrl}/pengeluaran-unit/search-item`, PengeluaranUnitController.searchItem);
 routes.get(`${baseUrl}/pengeluaran-unit`, PengeluaranUnitController.getAllPengeluaranUnit);
 routes.get(`${baseUrl}/pengeluaran-unit/:uuid`, PengeluaranUnitController.getPengeluaranUnitByUuid);
+
+// RETUR UNIT
+routes.post(`${baseUrl}/retur-unit`, ReturUnitController.createReturUnit);
+routes.get(`${baseUrl}/retur-unit`, ReturUnitController.getAllReturUnit);
+routes.get(`${baseUrl}/retur-unit/:uuid`, ReturUnitController.getReturUnitByUuid);
 
 export default routes;
 

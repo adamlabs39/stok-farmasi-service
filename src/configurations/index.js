@@ -1,5 +1,5 @@
 import { sequelize, connectDB } from "./database-instance.js";
-import axios  from "./axios-instance.js";
+import { inventoryAPI } from "./axios-instance.js";
 import { env } from "./environment.js";
 import logger from "./logger.js";
 
@@ -8,5 +8,6 @@ export {
   sequelize,
   connectDB,
   logger,
-  axios
+  // axios,
+  inventoryAPI
 };

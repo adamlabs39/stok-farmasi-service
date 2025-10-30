@@ -5,54 +5,67 @@ import { PengeluaranUnitValidation } from "../validations/pengeluaran-unit.valid
 import ZodValidator from "../validations/zod.validation.js";
 import { generateNoPengeluaranUnit } from "../helpers/generator.helper.js";
 import PengeluaranUnitHelper from "../helpers/pengeluaran-unit.helper.js";
+import InventoryService from "./inventory.service.js";
+import ResponseError from "../errors/ResponseError.js";
 
 export default class PengeluaranUnitService {
-  static async createPengeluaranUnit(req) {
-    const transaction = await sequelize.transaction();
+  static async createPengeluaranUnit(data, author, token) {
     try {
       const validatedData = ZodValidator.validate(
         PengeluaranUnitValidation.CREATE,
-        req.body
+        data
+      );
+      const { items: itemsFromRequest } = validatedData;
+      // const jenis_stok_uuid = validatedData.jenis_stok_uuid;
+      const stockUuids = itemsFromRequest.map((item) => item.stock_uuid);
+      const stockDetailsFromDb =
+        await PengeluaranUnitRepository.findStokDetailsByUuids(stockUuids);
+
+      const stockMap = new Map(
+        stockDetailsFromDb.map((stock) => [stock.uuid, stock])
       );
 
-      const faskesUuid = req.author.faskesUuid;
-      const petugas = req.author.username;
-
-      const totalHarga = validatedData.items.reduce((sum, item) => {
-        return sum + item.qty * item.harga_satuan;
-      }, 0);
-
-      const itemsToCreate = validatedData.items.map((item) => ({
-        ...item,
-        uuid: uuidv7(),
-        faskes_uuid: faskesUuid,
-      }));
+      const finalItems = itemsFromRequest.map((item) => {
+        const stockDetail = stockMap.get(item.stock_uuid);
+        if (!stockDetail) {
+          throw new ResponseError(
+            `Stok dengan UUID ${item.stock_uuid} tidak ditemukan.`,
+            400
+          );
+        }
+        if (stockDetail.sisa_stok < item.qty) {
+          throw new ResponseError(
+            `Sisa stok tidak mencukupi (Sisa: ${stockDetail.sisa_stok}, Diminta: ${item.qty})`,
+            400
+          );
+        }
+        return {
+          ...item,
+          faskes_uuid: author.faskesUuid,
+          item_medis_uuid: stockDetail.item_medis_jenis_stok.item_medis_uuid,
+        };
+      });
 
       const enrichedData = {
         ...validatedData,
         uuid: uuidv7(),
         no_pengeluaran: generateNoPengeluaranUnit(),
         tanggal_pengeluaran: Date.now(),
-        total_item: validatedData.items.length,
-        total_harga: totalHarga,
-        petugas_pengeluaran: petugas,
-        petugas_pengeluaran_uuid: petugas,
-        faskes_uuid: faskesUuid,
-        items: itemsToCreate,
+        total_item: finalItems.length,
+        total_harga: finalItems.reduce(
+          (sum, item) => sum + (item.harga_satuan || 0) * item.qty,
+          0
+        ),
+        petugas_pengeluaran: author.username,
+        petugas_pengeluaran_uuid: author.user_uuid,
+        faskes_uuid: author.faskesUuid,
+        items: finalItems,
       };
 
-      // TODO: Panggil API ke layanan inventory untuk mengurangi stok
-      // await InventoryService.decreaseStock(itemsToCreate, transaction);
+      await InventoryService.catatPengeluaranUnit(enrichedData, token);
 
-      const result = await PengeluaranUnitRepository.createPengeluaranUnit(
-        enrichedData,
-        transaction
-      );
-
-      await transaction.commit();
-      return result;
+      return enrichedData;
     } catch (error) {
-      await transaction.rollback();
       throw error;
     }
   }
@@ -92,7 +105,7 @@ export default class PengeluaranUnitService {
 
   static async getPengeluaranUnitByUuid(uuid, faskesUuid) {
     try {
-      const result = await PengeluaranUnitRepository.getPengeluaranUnitByUuid(  
+      const result = await PengeluaranUnitRepository.getPengeluaranUnitByUuid(
         uuid,
         faskesUuid
       );
@@ -103,6 +116,6 @@ export default class PengeluaranUnitService {
       return { data: PengeluaranUnitHelper.mapPengeluaranUnit(result) };
     } catch (error) {
       throw error;
-    } 
+    }
   }
 }

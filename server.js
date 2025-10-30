@@ -1,6 +1,6 @@
 import app from "./app.js";
 import { env, logger, connectDB } from "./src/configurations/index.js";
-
+console.log(`Inventory URL log dari server.js: ${env.INVENTORY_URL}`);
 const startServer = async () => {
   try {
     await connectDB();

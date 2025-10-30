@@ -30,3 +30,9 @@ export const generateNoPengeluaranUnit = () => {
   const randomChars = generateRandomAlphanumeric(4);
   return `${prefix}${randomChars}`;
 };
+
+export const generateNoReturUnit = () => {
+  const prefik = "RTR";
+  const ramdomChars = generateRandomAlphanumeric(4);
+  return `${prefik}${ramdomChars}`;
+}
