@@ -59,7 +59,8 @@ export default class PermintaanUnitService {
 
       const enrichedData = {
         ...validatedData,
-        jenis_stok: validatedData.jenis_stok_uuid,
+        jenis_stok_uuid: validatedData.jenis_stok_uuid,
+        jenis_stok_name: validatedData.jenis_stok,
         jenis_item: validatedData.kategori_item,
 
         uuid: uuidv7(),
@@ -74,7 +75,6 @@ export default class PermintaanUnitService {
 
         items: itemsToCreate,
       };
-
       const result = await PermintaanUnitRepository.createPermintaanUnit(
         enrichedData,
         transaction
