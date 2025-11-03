@@ -20,6 +20,9 @@ const createPermintaanUnitSchema = z.object({
   jenis_stok_uuid: z
     .string({ required_error: "jenis_stok_uuid harus diisi." })
     .uuid({ message: "jenis_stok_uuid harus berupa UUID yang valid." }),
+  jenis_stok: z
+    .string({ required_error: "jenis_stok harus diisi." })
+    .min(1, { message: "jenis_stok tidak boleh kosong." }),
   lokasi_stok_awal_uuid: z
     .string({ required_error: "lokasi_stok_awal_uuid harus diisi." })
     .uuid({ message: "lokasi_stok_awal_uuid harus berupa UUID yang valid." }),

@@ -59,7 +59,8 @@ export default class PermintaanUnitService {
 
       const enrichedData = {
         ...validatedData,
-        jenis_stok: validatedData.jenis_stok_uuid,
+        jenis_stok_uuid: validatedData.jenis_stok_uuid,
+        jenis_stok_name: validatedData.jenis_stok,
         jenis_item: validatedData.kategori_item,
 
         uuid: uuidv7(),
@@ -74,7 +75,6 @@ export default class PermintaanUnitService {
 
         items: itemsToCreate,
       };
-
       const result = await PermintaanUnitRepository.createPermintaanUnit(
         enrichedData,
         transaction
@@ -109,14 +109,64 @@ export default class PermintaanUnitService {
       );
 
       const { status } = validatedData;
+      const faskesUuid = author.faskesUuid;
+
+      const originalPermintaan =
+        await PermintaanUnitRepository.getPermintaanUnitByUuid(
+          uuid,
+          faskesUuid
+        );
+
+      console.log("Original Permintaan:", originalPermintaan);
+
+      if (!originalPermintaan) {
+        throw new ResponseError(`Permintaan unit tidak ditemukan.`, 404);
+      }
 
       if (status === "verified" || status === "verif_sebagian") {
+        if (
+          ["cancel", "dikirim", "verified", "verif_sebagian"].includes(
+            originalPermintaan.status
+          )
+        ) {
+          throw new ResponseError(
+            `Permintaan unit sudah ${originalPermintaan.status} dan tidak bisa di verifikasi lagi.`,
+            400
+          );
+        }
+
         if (!validatedData.items || validatedData.items.length === 0) {
           throw new ResponseError(
             `Properti 'items' wajib diisi saat verifikasi.`,
             400
           );
         }
+
+        const originalQtyMap = new Map(
+          originalPermintaan.items.map((item) => [
+            item.uuid,
+            item.qty_permintaan,
+          ])
+        );
+
+        for (const itemFromRequest of validatedData.items) {
+          const originalQty = originalQtyMap.get(itemFromRequest.uuid);
+
+          if (originalQty === undefined) {
+            throw new ResponseError(
+              `Item dengan UUID ${itemFromRequest.uuid} tidak ditemukan dalam permintaan unit ini.`,
+              404
+            );
+          }
+
+          if (itemFromRequest.qty_pengiriman > originalQty) {
+            throw new ResponseError(
+              `Kuantitas pengiriman (${itemFromRequest.qty_pengiriman}) melebihi kuantitas yang diminta (${originalQty}).`,
+              400
+            );
+          }
+        }
+
         const itemsPayload = {
           item: validatedData.items.map((i) => ({
             uuid: i.uuid,
@@ -130,6 +180,14 @@ export default class PermintaanUnitService {
           token
         );
       } else if (status === "dikirim") {
+        if (
+          !["verified", "verif_sebagian"].includes(originalPermintaan.status)
+        ) {
+          throw new ResponseError(
+            `Hanya permintaan yang sudah diverifikasi yang bisa dikirim.`,
+            400
+          );
+        }
         const kirimPayload = {
           catatan_pengiriman: validatedData.catatan_pengiriman || null,
         };
@@ -140,6 +198,16 @@ export default class PermintaanUnitService {
           token
         );
       } else if (status === "cancel") {
+        if (
+          ["dikirim", "verified", "verif_sebagian"].includes(
+            originalPermintaan.status
+          )
+        ) {
+          throw new ResponseError(
+            `Permintaan unit sudah ${originalPermintaan.status} dan tidak bisa dibatalkan.`,
+            400
+          );
+        }
         const batalPayload = {
           alasan_batal:
             validatedData.alasan_batal ||
