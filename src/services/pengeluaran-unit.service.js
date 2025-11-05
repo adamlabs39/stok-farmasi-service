@@ -1,5 +1,4 @@
 import { v7 as uuidv7 } from "uuid";
-import { sequelize } from "../configurations/database-instance.js";
 import PengeluaranUnitRepository from "../repositories/pengeluaran-unit.repository.js";
 import { PengeluaranUnitValidation } from "../validations/pengeluaran-unit.validation.js";
 import ZodValidator from "../validations/zod.validation.js";
