@@ -27,13 +27,36 @@ export default class PengeluaranUnitRepository {
             exclude: ["id", "created_at", "updated_at", "deleted_at"],
           },
           include: [
-            { model: StockMedisModel, as: "stok" },
+            {
+              model: StockMedisModel,
+              as: "stok",
+              include: [
+                {
+                  model: ItemMedisJenisStokModel,
+                  as: "item_medis_jenis_stok",
+                  required: false,
+                  include: [
+                    {
+                      model: ItemMedisModel,
+                      as: "item_medis",
+                      required: false,
+                      attributes: ["uuid", "code", "name"],
+                    },
+                  ],
+                },
+              ],
+            },
             { model: ConversionModel, as: "konversi" },
           ],
         },
         {
           model: LokasiStokModel,
           as: "lokasi_stok_akhir",
+          attributes: ["uuid", "name"],
+        },
+        {
+          model: LokasiStokModel,
+          as: "lokasi_stok_awal",
           attributes: ["uuid", "name"],
         },
         {
@@ -76,9 +99,7 @@ export default class PengeluaranUnitRepository {
 
     const isSearching = query.no_pengeluaran;
     if (isSearching && result.count === 0) {
-      throw new NotFoundError(
-        `Data pengeluaran unit tidak ditemukan.`
-      );
+      throw new NotFoundError(`Data pengeluaran unit tidak ditemukan.`);
     }
 
     return getPagingData(result, page, pageSize);

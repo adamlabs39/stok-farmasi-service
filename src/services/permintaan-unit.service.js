@@ -1,11 +1,10 @@
 import { v7 as uuidv7 } from "uuid";
-import { logger, sequelize } from "../configurations/index.js";
 import { PermintaanUnitValidation } from "../validations/permintaan-unit.validation.js";
 import PermintaanUnitRepository from "../repositories/permintaan-unit.repository.js";
 import { generateNoPermintaanUnit } from "../helpers/generator.helper.js";
 import ZodValidator from "../validations/zod.validation.js";
 import PermintaanUnitHelper from "../helpers/permintaan-unit.helper.js";
-
+import sequelizeInstance from "@adameds/model-sdk/instance";
 import InventoryService from "./inventory.service.js";
 import ResponseError from "../errors/ResponseError.js";
 
@@ -41,7 +40,7 @@ export default class PermintaanUnitService {
   }
 
   static async createPermintaanUnit(req) {
-    const transaction = await sequelize.transaction();
+    const transaction = await sequelizeInstance.transaction();
     try {
       const validatedData = ZodValidator.validate(
         PermintaanUnitValidation.CREATE,

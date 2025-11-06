@@ -1,4 +1,3 @@
-import { sequelize } from "../configurations/database-instance.js";
 import NotFoundError from "../errors/NotFoundError.js";
 import { generateNoReturUnit } from "../helpers/generator.helper.js";
 import ReturUnitHelper from "../helpers/retur-unit.helper.js";
@@ -9,6 +8,7 @@ import { v7 as uuidv7 } from "uuid";
 import KonfigurasiHargaRepository from "../repositories/konfigurasi-harga-repository.js";
 import { ItemMedisModel } from "@adameds/model-sdk/farmasi";
 import StockMedisRepository from "../repositories/stock-medis-repository.js";
+import sequelizeInstance from "@adameds/model-sdk/instance";
 
 export default class ReturUnitService {
   static async createReturUnit(data, author, token) {
@@ -31,7 +31,7 @@ export default class ReturUnitService {
       const metode_pemotongan_stok =
         configInfo?.metode_pemotongan_stok || "FIFO";
 
-      transaction = await sequelize.transaction();
+      transaction = await sequelizeInstance.transaction();
 
       const totalHarga = validatedData.items.reduce(
         (sum, item) => sum + item.qty * item.harga_satuan,

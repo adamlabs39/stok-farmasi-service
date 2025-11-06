@@ -11,6 +11,7 @@ export default class InventoryService {
       jenis_stok_uuid: dataMutasi.jenis_stok_uuid,
       lokasi_stok_awal_uuid: dataMutasi.lokasi_stok_awal_uuid,
       tanggal_pengeluaran: dataMutasi.tanggal_pengeluaran,
+      catatan: dataMutasi.catatan,
       items: dataMutasi.items.map((item) => ({
         stock_uuid: item.stock_uuid,
         exp_date: item.exp_date,
