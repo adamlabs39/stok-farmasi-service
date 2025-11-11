@@ -97,7 +97,15 @@ export default class PermintaanUnitRepository {
     }
 
     if (query.status) {
-      whereClause.status = query.status;
+      let statuses = query.status;
+      if (typeof statuses === "string") {
+      statuses = statuses.split(",").map((s) => s.trim()).filter(Boolean);
+      }
+      if (Array.isArray(statuses)) {
+      whereClause.status = statuses.length === 1 ? statuses[0] : { [Op.in]: statuses };
+      } else {
+      whereClause.status = statuses;
+      }
     }
 
     const includeClause = [...this._baseOptions.include];
@@ -135,6 +143,7 @@ export default class PermintaanUnitRepository {
   }
 
   static async getPermintaanUnitByUuid(uuid, faskesUuid) {
+    console.log("Repository: Getting permintaan unit by UUID:", uuid);
     return PermintaanUnitModel.findOne({
       where: {
         uuid,

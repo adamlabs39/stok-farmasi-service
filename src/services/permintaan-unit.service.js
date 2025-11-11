@@ -33,6 +33,13 @@ export default class PermintaanUnitService {
         uuid,
         faskesUuid
       );
+
+      if (!result) {
+        throw new ResponseError(
+          `Permintaan unit dengan UUID ${uuid} tidak ditemukan atau bukan milik faskes Anda.`, 404
+        );
+      }
+
       return { data: PermintaanUnitHelper.mapPermintaanUnit(result) };
     } catch (error) {
       throw error;
