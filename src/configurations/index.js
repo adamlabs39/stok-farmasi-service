@@ -1,12 +1,13 @@
-import { sequelize, connectDB } from "./database-instance.js";
-import axios  from "./axios-instance.js";
+import { inventoryAPI } from "./axios-instance.js";
 import { env } from "./environment.js";
 import logger from "./logger.js";
+import sequelizeInstance from "@adameds/model-sdk/instance";
+import { connectDB } from "./database-instance.js";
 
 export {
   env,
-  sequelize,
   connectDB,
+  sequelizeInstance,
   logger,
-  axios
+  inventoryAPI
 };

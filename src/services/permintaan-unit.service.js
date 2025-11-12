@@ -1,11 +1,11 @@
 import { v7 as uuidv7 } from "uuid";
-import { sequelize } from "../configurations/index.js";
 import { PermintaanUnitValidation } from "../validations/permintaan-unit.validation.js";
 import PermintaanUnitRepository from "../repositories/permintaan-unit.repository.js";
 import { generateNoPermintaanUnit } from "../helpers/generator.helper.js";
 import ZodValidator from "../validations/zod.validation.js";
 import PermintaanUnitHelper from "../helpers/permintaan-unit.helper.js";
-import NotFoundError from "../errors/NotFoundError.js";
+import sequelizeInstance from "@adameds/model-sdk/instance";
+import InventoryService from "./inventory.service.js";
 import ResponseError from "../errors/ResponseError.js";
 
 export default class PermintaanUnitService {
@@ -33,6 +33,13 @@ export default class PermintaanUnitService {
         uuid,
         faskesUuid
       );
+
+      if (!result) {
+        throw new ResponseError(
+          `Permintaan unit dengan UUID ${uuid} tidak ditemukan atau bukan milik faskes Anda.`, 404
+        );
+      }
+
       return { data: PermintaanUnitHelper.mapPermintaanUnit(result) };
     } catch (error) {
       throw error;
@@ -40,7 +47,7 @@ export default class PermintaanUnitService {
   }
 
   static async createPermintaanUnit(req) {
-    const transaction = await sequelize.transaction();
+    const transaction = await sequelizeInstance.transaction();
     try {
       const validatedData = ZodValidator.validate(
         PermintaanUnitValidation.CREATE,
@@ -58,7 +65,8 @@ export default class PermintaanUnitService {
 
       const enrichedData = {
         ...validatedData,
-        jenis_stok: validatedData.jenis_stok_uuid,
+        jenis_stok_uuid: validatedData.jenis_stok_uuid,
+        jenis_stok_name: validatedData.jenis_stok,
         jenis_item: validatedData.kategori_item,
 
         uuid: uuidv7(),
@@ -67,13 +75,12 @@ export default class PermintaanUnitService {
         total_item: validatedData.items.length,
         status: "request",
 
-        petugas_permintaan_uuid: req.author.username,
+        petugas_permintaan_uuid: req.author.user_uuid,
         petugas_permintaan: req.author.username,
         faskes_uuid: faskesUuid,
 
         items: itemsToCreate,
       };
-
       const result = await PermintaanUnitRepository.createPermintaanUnit(
         enrichedData,
         transaction
@@ -100,139 +107,131 @@ export default class PermintaanUnitService {
     }
   }
 
-  static async updateStatusPenerimaan(uuid, faskesUuid, req) {
-    const transaction = await sequelize.transaction();
+  static async updateStatusPenerimaan(uuid, data, author, token) {
     try {
       const validatedData = ZodValidator.validate(
         PermintaanUnitValidation.UPDATE_STATUS,
-        req.body
+        data
       );
 
-      const petugas = req.author.username;
+      const { status } = validatedData;
+      const faskesUuid = author.faskesUuid;
 
-      if (validatedData.status === "dikirim") {
-        const originalPermintaan =
-          await PermintaanUnitRepository.getPermintaanUnitByUuid(
-            uuid,
-            faskesUuid
-          );
+      const originalPermintaan =
+        await PermintaanUnitRepository.getPermintaanUnitByUuid(
+          uuid,
+          faskesUuid
+        );
+
+      console.log("Original Permintaan:", originalPermintaan);
+
+      if (!originalPermintaan) {
+        throw new ResponseError(`Permintaan unit tidak ditemukan.`, 404);
+      }
+
+      if (status === "verified" || status === "verif_sebagian") {
         if (
-          !originalPermintaan ||
-          ["cancel", "dikirim"].includes(originalPermintaan.status)
+          ["cancel", "dikirim", "verified", "verif_sebagian"].includes(
+            originalPermintaan.status
+          )
         ) {
           throw new ResponseError(
-            "Permintaan unit tidak ditemukan atau sudah dibatalkan/dikirim.",
+            `Permintaan unit sudah ${originalPermintaan.status} dan tidak bisa di verifikasi lagi.`,
             400
           );
         }
 
-        const leftoverItems = [];
-        const itemsToUpdate = [];
-        const shippedItemsMap = new Map(
-          validatedData.items.map((i) => [i.uuid, i.qty_pengiriman])
-        );
-        let isPartialShipment = false;
+        if (!validatedData.items || validatedData.items.length === 0) {
+          throw new ResponseError(
+            `Properti 'items' wajib diisi saat verifikasi.`,
+            400
+          );
+        }
 
-        for (const item of originalPermintaan.items) {
-          const qty_pengiriman = shippedItemsMap.get(item.uuid) || 0;
-          if (qty_pengiriman > item.qty_permintaan) {
+        const originalQtyMap = new Map(
+          originalPermintaan.items.map((item) => [
+            item.uuid,
+            item.qty_permintaan,
+          ])
+        );
+
+        for (const itemFromRequest of validatedData.items) {
+          const originalQty = originalQtyMap.get(itemFromRequest.uuid);
+
+          if (originalQty === undefined) {
             throw new ResponseError(
-              `Kuantitas pengiriman untuk item ${item.uuid} melebihi kuantitas permintaan.`,
-              400
+              `Item dengan UUID ${itemFromRequest.uuid} tidak ditemukan dalam permintaan unit ini.`,
+              404
             );
           }
 
-          itemsToUpdate.push({
-            uuid: item.uuid,
-            dataToUpdate: { qty_pengiriman },
-          });
-
-          const remainingQty = item.qty_permintaan - qty_pengiriman;
-          if (remainingQty > 0) {
-            isPartialShipment = true;
-            leftoverItems.push({
-              uuid: uuidv7(),
-              faskes_uuid: faskesUuid,
-              kategori_item: item.kategori_item,
-              item_uuid: item.item_uuid,
-              qty_permintaan: remainingQty,
-              konversi_uuid: item.konversi_uuid,
-            });
+          if (itemFromRequest.qty_pengiriman > originalQty) {
+            throw new ResponseError(
+              `Kuantitas pengiriman (${itemFromRequest.qty_pengiriman}) melebihi kuantitas yang diminta (${originalQty}).`,
+              400
+            );
           }
         }
-        await PermintaanUnitRepository.bulkUpdateItems(
-          itemsToUpdate,
-          transaction
-        );
 
-        const dataUpdateOriginal = {
-          status: "dikirim",
-          petugas_kirim: petugas,
+        const itemsPayload = {
+          item: validatedData.items.map((i) => ({
+            uuid: i.uuid,
+            quantity: i.qty_pengiriman,
+          })),
+          catatan_verifikasi: validatedData.catatan_verifikasi || null,
+        };
+        return await InventoryService.verifikasiPengiriman(
+          uuid,
+          itemsPayload,
+          token
+        );
+      } else if (status === "dikirim") {
+        if (
+          !["verified", "verif_sebagian"].includes(originalPermintaan.status)
+        ) {
+          throw new ResponseError(
+            `Hanya permintaan yang sudah diverifikasi yang bisa dikirim.`,
+            400
+          );
+        }
+        const kirimPayload = {
           catatan_pengiriman: validatedData.catatan_pengiriman || null,
         };
-        await PermintaanUnitRepository.updateStatusPermintaan(
-          uuid,
-          faskesUuid,
-          dataUpdateOriginal,
-          transaction
-        );
 
-        if (isPartialShipment && leftoverItems.length > 0) {
-          const newPermintaanData = {
-            uuid: uuidv7(),
-            faskes_uuid: faskesUuid,
-            no_permintaan: generateNoPermintaanUnit(),
-            tanggal_permintaan: Date.now(),
-            total_item: leftoverItems.length,
-            status: "request_sebagian",
-            petugas_permintaan_uuid: originalPermintaan.petugas_permintaan_uuid,
-            petugas_permintaan: originalPermintaan.petugas_permintaan,
-            lokasi_stok_tujuan_uuid: originalPermintaan.lokasi_stok_tujuan_uuid,
-            kategori_item: originalPermintaan.kategori_item,
-            jenis_stok_uuid: originalPermintaan.jenis_stok_uuid,
-            catatan: `Permintaan lanjutan dari ${originalPermintaan.no_permintaan}`,
-            items: leftoverItems,
-            jenis_stok: originalPermintaan.jenis_stok,
-            jenis_item: originalPermintaan.jenis_item,
-            lokasi_stok_awal_uuid: originalPermintaan.lokasi_stok_awal_uuid,
-            cito: originalPermintaan.cito,
-          };
-          await PermintaanUnitRepository.createPermintaanUnit(
-            newPermintaanData,
-            transaction
+        return await InventoryService.kirimPengiriman(
+          uuid,
+          kirimPayload,
+          token
+        );
+      } else if (status === "cancel") {
+        if (
+          ["dikirim", "verified", "verif_sebagian"].includes(
+            originalPermintaan.status
+          )
+        ) {
+          throw new ResponseError(
+            `Permintaan unit sudah ${originalPermintaan.status} dan tidak bisa dibatalkan.`,
+            400
           );
         }
-      } else {
-        const dataToUpdate = {
-          status: validatedData.status,
+        const batalPayload = {
+          alasan_batal:
+            validatedData.alasan_batal ||
+            "Dibatalkan oleh Petugas Stok Farmasi",
         };
 
-        if (["verified", "verif_sebagian"].includes(validatedData.status)) {
-          dataToUpdate.petugas_verifikasi = petugas;
-          dataToUpdate.catatan_verifikasi =
-            validatedData.catatan_verifikasi || null;
-        } else if (validatedData.status === "cancel") {
-          dataToUpdate.alasan_batal = validatedData.alasan_batal || null;
-        }
-
-        const [updatedRowCount] =
-          await PermintaanUnitRepository.updateStatusPermintaan(
-            uuid,
-            faskesUuid,
-            dataToUpdate,
-            transaction
-          );
-
-        if (updatedRowCount === 0) {
-          throw new NotFoundError(
-            "Permintaan unit tidak ditemukan atau tidak dapat diupdate."
-          );
-        }
+        return await InventoryService.batalPengiriman(
+          uuid,
+          batalPayload,
+          token
+        );
+      } else {
+        throw new ResponseError(
+          `Perubahan status ke '${status}' tidak didukung melalui endpoint ini.`,
+          400
+        );
       }
-
-      await transaction.commit();
     } catch (error) {
-      await transaction.rollback();
       throw error;
     }
   }

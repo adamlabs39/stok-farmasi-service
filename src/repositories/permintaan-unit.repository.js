@@ -1,11 +1,16 @@
-import { ItemMedisModel, LokasiStokModel } from "@adameds/model-sdk/farmasi";
+import { Op } from "sequelize";
+import { getPagination, getPagingData } from "../helpers/pagination.helper.js";
 import {
   PermintaanUnitItemModel,
   PermintaanUnitModel,
+  StockMedisModel,
 } from "@adameds/model-sdk/inventory";
-import { Op } from "sequelize";
-import { getPagination, getPagingData } from "../helpers/pagination.helper.js";
-import NotFoundError from "../errors/NotFoundError.js";
+import {
+  ItemMedisJenisStokModel,
+  ItemMedisModel,
+  LokasiStokModel,
+  SatuanModel,
+} from "@adameds/model-sdk/farmasi";
 import ResponseError from "../errors/ResponseError.js";
 
 export default class PermintaanUnitRepository {
@@ -24,7 +29,7 @@ export default class PermintaanUnitRepository {
         {
           model: PermintaanUnitItemModel,
           as: "items",
-          separate: true,
+          // separate: true,
           attributes: {
             exclude: [
               "id",
@@ -34,6 +39,47 @@ export default class PermintaanUnitRepository {
               "deleted_at",
             ],
           },
+          include: [
+            {
+              model: ItemMedisModel,
+              as: "item_medis",
+              attributes: ["name", "satuan_kemasan_uuid"],
+              include: [
+                {
+                  model: SatuanModel,
+                  as: "satuan_penggunaan",
+                  attributes: ["name"],
+                },
+                {
+                  model: ItemMedisJenisStokModel,
+                  as: "jenis_stok",
+                  attributes: ["uuid"],
+
+                  where: {
+                    jenis_stok_uuid: {
+                      [Op.col]: "PermintaanUnitModel.jenis_stok_uuid",
+                    },
+                  },
+                  required: false,
+                  include: [
+                    {
+                      model: StockMedisModel,
+                      as: "stocks",
+                      attributes: ["sisa_stok", "harga_satuan"],
+                      where: {
+                        lokasi_stok_uuid: {
+                          [Op.col]: "PermintaanUnitModel.lokasi_stok_awal_uuid",
+                        },
+                        sisa_stok: { [Op.gt]: 0 },
+                        deleted_at: null,
+                      },
+                      required: false,
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
         },
         {
           model: LokasiStokModel,
@@ -46,13 +92,20 @@ export default class PermintaanUnitRepository {
 
   static async getAllPermintaanUnit(query, faskesUuid) {
     const whereClause = { faskes_uuid: faskesUuid };
-
     if (query.no_permintaan) {
       whereClause.no_permintaan = { [Op.iLike]: `%${query.no_permintaan}%` };
     }
 
     if (query.status) {
-      whereClause.status = query.status;
+      let statuses = query.status;
+      if (typeof statuses === "string") {
+      statuses = statuses.split(",").map((s) => s.trim()).filter(Boolean);
+      }
+      if (Array.isArray(statuses)) {
+      whereClause.status = statuses.length === 1 ? statuses[0] : { [Op.in]: statuses };
+      } else {
+      whereClause.status = statuses;
+      }
     }
 
     const includeClause = [...this._baseOptions.include];
@@ -77,12 +130,20 @@ export default class PermintaanUnitRepository {
       order: [["tanggal_permintaan", "DESC"]],
       limit,
       offset,
+      distinct: true,
     });
+
+    const isSearching =
+      query.no_permintaan || query.status || query.nama_lokasi_tujuan;
+    if (isSearching && result.count === 0) {
+      throw new ResponseError(`Data permintaan unit tidak ditemukan.`, 404);
+    }
 
     return getPagingData(result, page, pageSize);
   }
 
   static async getPermintaanUnitByUuid(uuid, faskesUuid) {
+    console.log("Repository: Getting permintaan unit by UUID:", uuid);
     return PermintaanUnitModel.findOne({
       where: {
         uuid,
@@ -118,42 +179,19 @@ export default class PermintaanUnitRepository {
     });
   }
 
-  static async bulkUpdateItems(items, transaction) {
-    const promises = items.map((item) =>
-      PermintaanUnitItemModel.update(item.dataToUpdate, {
-        where: { uuid: item.uuid },
-        transaction,
-      })
-    );
-    return Promise.all(promises);
-  }
-
   static async updateStatusPermintaan(
     uuid,
     faskesUuid,
     dataToUpdate,
     transaction
   ) {
-    const permintaan = await PermintaanUnitModel.findOne({
-      where: { uuid, faskes_uuid: faskesUuid },
-      attributes: ['status'],
-      transaction
-    });
-
-    if (!permintaan) {
-      throw new NotFoundError("Permintaan unit tidak ditemukan.");
-    }
-    if(['cancel', 'dikirim']. includes(permintaan.status)) {
-      throw new ResponseError("Permintaan unit sudah dibatalkan atau dikirim, tidak bisa diubah statusnya.", 400);
-    }
-
-    if(dataToUpdate.status === 'cancel' && ['verified', 'verif_sebagian', 'dikirim'].includes(permintaan.status)) {
-      throw new ResponseError("Permintaan unit sudah diverifikasi atau dikirim, tidak bisa dibatalkan.", 400);
-    }
-
-    return PermintaanUnitModel.update(dataToUpdate, {
-      where: { uuid, faskes_uuid: faskesUuid },
+    const [updatedRowCount] = await PermintaanUnitModel.update(dataToUpdate, {
+      where: {
+        uuid: uuid,
+        faskes_uuid: faskesUuid,
+      },
       transaction,
     });
+    return [updatedRowCount];
   }
 }

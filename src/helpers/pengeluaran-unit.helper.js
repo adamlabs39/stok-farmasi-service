@@ -3,7 +3,6 @@ import moment from "moment";
 export default class PengeluaranUnitHelper {
   static mapPengeluaranUnit(unit) {
     const rawUnit = unit.get ? unit.get({ plain: true }) : unit;
-
     return {
       uuid: rawUnit.uuid,
       no_pengeluaran: rawUnit.no_pengeluaran,
@@ -11,15 +10,23 @@ export default class PengeluaranUnitHelper {
         "YYYY-MM-DD HH:mm"
       ),
       jenis_pengeluaran: rawUnit.jenis_pengeluaran,
+      jenis_pemusnahan: rawUnit.jenis_pemusnahan,
       kategori_item: rawUnit.kategori_item,
       jenis_stok: {
         uuid: rawUnit.jenis_stok?.uuid,
         name: rawUnit.jenis_stok?.name,
       },
-      lokasi_stok_akhir: {
-        uuid: rawUnit.lokasi_stok_akhir?.uuid,
-        name: rawUnit.lokasi_stok_akhir?.name,
+      lokasi_stok_awal: {
+        uuid: rawUnit.lokasi_stok_awal?.uuid || null,
+        name: rawUnit.lokasi_stok_awal?.name || null,
       },
+      lokasi_stok_akhir: rawUnit.lokasi_stok_akhir
+        ? {
+            uuid: rawUnit.lokasi_stok_akhir.uuid,
+            name: rawUnit.lokasi_stok_akhir.name,
+          }
+        : null,
+
       catatan: rawUnit.catatan,
       total_item: rawUnit.total_item,
       total_harga: rawUnit.total_harga,
@@ -44,7 +51,7 @@ export default class PengeluaranUnitHelper {
             ? moment(item.stok.exp_date).format("YYYY-MM-DD")
             : null,
           harga_satuan: item.harga_satuan,
-          satuan: item.konversi?.satuan_pembelian, 
+          satuan: item.konversi?.satuan_pembelian,
         };
       }),
     };

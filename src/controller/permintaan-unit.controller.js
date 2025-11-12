@@ -65,12 +65,14 @@ export default class PermintaanUnitController {
   static async updateStatusPenerimaan(req, res, next) {
     try {
       const { uuid } = req.params;
-      const faskesUuid = req.author.faskesUuid;
-      // const reqData = req.body;
+      const data = req.body;
+      const author = req.author;
+      const token = req.headers.authorization;
       await PermintaanUnitService.updateStatusPenerimaan(
         uuid,
-        faskesUuid,
-        req
+        data,
+        author,
+        token
       );
       res
         .status(200)

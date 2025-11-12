@@ -1,5 +1,6 @@
 import {
   ConversionModel,
+  ItemMedisJenisStokModel,
   ItemMedisModel,
   JenisStokModel,
   LokasiStokModel,
@@ -11,6 +12,7 @@ import {
 } from "@adameds/model-sdk/inventory";
 import { Op } from "sequelize";
 import { getPagination, getPagingData } from "../helpers/pagination.helper.js";
+import NotFoundError from "../errors/NotFoundError.js";
 
 export default class PengeluaranUnitRepository {
   static get _baseOptions() {
@@ -25,7 +27,25 @@ export default class PengeluaranUnitRepository {
             exclude: ["id", "created_at", "updated_at", "deleted_at"],
           },
           include: [
-            { model: StockMedisModel, as: "stok" },
+            {
+              model: StockMedisModel,
+              as: "stok",
+              include: [
+                {
+                  model: ItemMedisJenisStokModel,
+                  as: "item_medis_jenis_stok",
+                  required: false,
+                  include: [
+                    {
+                      model: ItemMedisModel,
+                      as: "item_medis",
+                      required: false,
+                      attributes: ["uuid", "code", "name"],
+                    },
+                  ],
+                },
+              ],
+            },
             { model: ConversionModel, as: "konversi" },
           ],
         },
@@ -35,19 +55,17 @@ export default class PengeluaranUnitRepository {
           attributes: ["uuid", "name"],
         },
         {
+          model: LokasiStokModel,
+          as: "lokasi_stok_awal",
+          attributes: ["uuid", "name"],
+        },
+        {
           model: JenisStokModel,
           as: "jenis_stok",
           attributes: ["uuid", "name"],
         },
       ],
     };
-  }
-
-  static async createPengeluaranUnit(data, transaction) {
-    return PengeluaranUnitModel.create(data, {
-      include: [{ model: PengeluaranUnitItemModel, as: "items" }],
-      transaction,
-    });
   }
 
   static async searchItem(query, faskesUuid) {
@@ -79,6 +97,11 @@ export default class PengeluaranUnitRepository {
       offset,
     });
 
+    const isSearching = query.no_pengeluaran;
+    if (isSearching && result.count === 0) {
+      throw new NotFoundError(`Data pengeluaran unit tidak ditemukan.`);
+    }
+
     return getPagingData(result, page, pageSize);
   }
 
@@ -86,6 +109,44 @@ export default class PengeluaranUnitRepository {
     return PengeluaranUnitModel.findOne({
       where: { uuid, faskes_uuid: faskesUuid },
       ...this._baseOptions,
+    });
+  }
+
+  static async findStokDetailsByUuids(stockUuids) {
+    return await StockMedisModel.findAll({
+      where: {
+        uuid: { [Op.in]: stockUuids },
+      },
+      include: [
+        {
+          model: ItemMedisJenisStokModel,
+          as: "item_medis_jenis_stok",
+          attributes: ["item_medis_uuid"],
+        },
+      ],
+    });
+  }
+
+  static async reduceLocalStock(items, transaction) {
+    const stockUpdates = items.map((item) =>
+      StockMedisModel.decrement("sisa_stok", {
+        by: item.qty,
+        where: { uuid: item.stock_uuid },
+        transaction,
+      })
+    );
+    await Promise.all(stockUpdates);
+  }
+
+  static async createPengeluaranUnit(data, transaction) {
+    return PengeluaranUnitModel.create(data, {
+      include: [
+        {
+          model: PengeluaranUnitItemModel,
+          as: "items",
+        },
+      ],
+      transaction,
     });
   }
 }

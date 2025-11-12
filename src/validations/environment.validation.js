@@ -10,6 +10,9 @@ export class EnvironmentValidation {
     DB_USERNAME: z.string(),
     DB_PASSWORD: z.string(),
     DB_NAME: z.string(),
+    INVENTORY_URL: z.string().url({
+      message: "INVENTORY_URL harus berupa URL yang valid",
+    }),
     PUBLIC_KEY: z.string({
       required_error: "PUBLIC_KEY tidak boleh kosong di .env",
     }),
